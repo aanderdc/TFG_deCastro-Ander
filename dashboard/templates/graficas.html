@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gráficas — S.I.E.M.</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --primary-dark: #0f172a;
+      --bg-light: #f8fafc;
+    }
+    body {
+      background-color: var(--bg-light);
+      color: #334155;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .header-bar {
+      background-color: var(--primary-dark);
+      color: white;
+      padding: 1.2rem 0;
+      border-bottom: 3px solid #334155;
+      margin-bottom: 2rem;
+      position: relative;
+    }
+    .chart-card {
+      background: white;
+      border-radius: 10px;
+      padding: 1.5rem;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      margin-bottom: 2rem;
+    }
+    .chart-title {
+      font-size: 0.8rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #64748b;
+      letter-spacing: 1px;
+      margin-bottom: 1rem;
+    }
+    .nav-btn {
+      background-color: white;
+      color: var(--primary-dark);
+      text-decoration: none;
+      padding: 0.8rem;
+      border-radius: 8px;
+      display: inline-block;
+      text-align: center;
+      font-weight: 600;
+      border: 2px solid #e2e8f0;
+      transition: all 0.2s;
+      font-size: 0.85rem;
+    }
+    .nav-btn:hover {
+      background-color: var(--primary-dark);
+      color: white;
+    }
+    .btn-rango {
+      font-size: 0.75rem;
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid #e2e8f0;
+      background: white;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-rango.active, .btn-rango:hover {
+      background: var(--primary-dark);
+      color: white;
+      border-color: var(--primary-dark);
+    }
+    .stat-mini {
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 0.8rem 1rem;
+      border: 1px solid #e2e8f0;
+      text-align: center;
+    }
+    .stat-mini .val { font-size: 1.4rem; font-weight: 700; color: #1e293b; }
+    .stat-mini .lbl { font-size: 0.65rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; }
+  </style>
+</head>
+<body>
+
+<div class="header-bar text-center" style="position:relative;">
+  <div class="container">
+    <h3 class="mb-1 fw-bold">GRÁFICAS HISTÓRICAS</h3>
+    <p class="mb-0 text-uppercase" style="font-size:0.8rem;color:#94a3b8;letter-spacing:2px;">TFG — Ander de Castro</p>
+  </div>
+  <a href="/logout" style="position:absolute;top:50%;right:24px;transform:translateY(-50%);
+      color:#94a3b8;font-size:0.75rem;font-weight:600;text-decoration:none;
+      border:1px solid #334155;padding:6px 14px;border-radius:6px;
+      text-transform:uppercase;letter-spacing:1px;transition:all 0.2s;"
+      onmouseover="this.style.color='#fff';this.style.borderColor='#ef4444'"
+      onmouseout="this.style.color='#94a3b8';this.style.borderColor='#334155'">
+      Salir →
+  </a>
+</div>
+
+<div class="container">
+
+  <!-- NAV -->
+  <div class="d-flex gap-2 mb-4 flex-wrap">
+    <a href="/" class="nav-btn">Dashboard</a>
+    <a href="/sniffer" class="nav-btn">Sniffer</a>
+    <a href="/graficas" class="nav-btn" style="background:var(--primary-dark);color:white;">Gráficas</a>
+    <a href="/alertas" class="nav-btn">Alertas</a>
+  </div>
+
+  <!-- SELECTOR RANGO -->
+  <div class="d-flex align-items-center gap-2 mb-4">
+    <span class="text-muted small fw-bold text-uppercase" style="font-size:0.7rem;letter-spacing:1px;">Rango:</span>
+    <button class="btn-rango active" onclick="setRango(6, this)">6h</button>
+    <button class="btn-rango" onclick="setRango(24, this)">24h</button>
+    <button class="btn-rango" onclick="setRango(48, this)">48h</button>
+    <button class="btn-rango" onclick="setRango(168, this)">7 días</button>
+    <span class="text-muted small ms-auto" id="last-update">—</span>
+  </div>
+
+  <!-- STATS MINI -->
+  <div class="row g-3 mb-4" id="stats-mini">
+    <div class="col-6 col-md-3">
+      <div class="stat-mini">
+        <div class="val" id="stat-bajada">—</div>
+        <div class="lbl">Total Bajada (MB)</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-mini">
+        <div class="val" id="stat-subida">—</div>
+        <div class="lbl">Total Subida (MB)</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-mini">
+        <div class="val" id="stat-dns">—</div>
+        <div class="lbl">Consultas DNS</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-mini">
+        <div class="val text-danger" id="stat-bloq">—</div>
+        <div class="lbl">Amenazas Bloqueadas</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GRAFICA TRAFICO TOTAL -->
+  <div class="chart-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="chart-title">Tráfico Total de Red — Bajada / Subida (MB)</div>
+    </div>
+    <canvas id="chartTraficoTotal" height="100"></canvas>
+  </div>
+
+  <!-- GRAFICA DNS -->
+  <div class="chart-card">
+    <div class="chart-title">Consultas DNS — Total vs Amenazas Bloqueadas</div>
+    <canvas id="chartDNS" height="100"></canvas>
+  </div>
+
+  <!-- GRAFICA DISPOSITIVOS -->
+  <div class="chart-card">
+    <div class="chart-title">Tráfico por Dispositivo (MB) — Top 10</div>
+    <canvas id="chartDispositivos" height="120"></canvas>
+  </div>
+
+</div>
+
+<script>
+  let horas = 6;
+  let chartTrafico = null;
+  let chartDNS = null;
+  let chartDisp = null;
+
+  const COLORS = [
+    '#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6',
+    '#06b6d4','#f97316','#84cc16','#ec4899','#6366f1'
+  ];
+
+  function setRango(h, btn) {
+    horas = h;
+    document.querySelectorAll('.btn-rango').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    loadAll();
+  }
+
+  function formatLabel(labels) {
+    return labels.map(l => {
+      const d = new Date(l);
+      return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    });
+  }
+
+  async function loadTraficoTotal() {
+    const r = await fetch(`/api/graficas/trafico_total?horas=${horas}`);
+    const d = await r.json();
+
+    const totalBajada = d.bajada.reduce((a,b) => a+b, 0).toFixed(1);
+    const totalSubida = d.subida.reduce((a,b) => a+b, 0).toFixed(1);
+    document.getElementById('stat-bajada').textContent = totalBajada;
+    document.getElementById('stat-subida').textContent = totalSubida;
+
+    const labels = formatLabel(d.labels);
+    const cfg = {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Bajada (MB)',
+            data: d.bajada,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,0.08)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0,
+            borderWidth: 2
+          },
+          {
+            label: 'Subida (MB)',
+            data: d.subida,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16,185,129,0.08)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0,
+            borderWidth: 2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { intersect: false, mode: 'index' },
+        plugins: { legend: { position: 'top' } },
+        scales: {
+          x: { ticks: { maxTicksLimit: 12, font: { size: 10 } } },
+          y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+        }
+      }
+    };
+
+    if (chartTrafico) chartTrafico.destroy();
+    chartTrafico = new Chart(document.getElementById('chartTraficoTotal'), cfg);
+  }
+
+  async function loadDNS() {
+    const r = await fetch(`/api/graficas/dns?horas=${horas}`);
+    const d = await r.json();
+
+    const lastTotal = d.total.length ? d.total[d.total.length-1] : 0;
+    const lastBloq  = d.bloqueadas.length ? d.bloqueadas[d.bloqueadas.length-1] : 0;
+    document.getElementById('stat-dns').textContent = lastTotal.toLocaleString();
+    document.getElementById('stat-bloq').textContent = lastBloq.toLocaleString();
+
+    const labels = formatLabel(d.labels);
+    const cfg = {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Total consultas',
+            data: d.total,
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99,102,241,0.08)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0,
+            borderWidth: 2
+          },
+          {
+            label: 'Bloqueadas',
+            data: d.bloqueadas,
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239,68,68,0.08)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0,
+            borderWidth: 2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { intersect: false, mode: 'index' },
+        plugins: { legend: { position: 'top' } },
+        scales: {
+          x: { ticks: { maxTicksLimit: 12, font: { size: 10 } } },
+          y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+        }
+      }
+    };
+
+    if (chartDNS) chartDNS.destroy();
+    chartDNS = new Chart(document.getElementById('chartDNS'), cfg);
+  }
+
+  async function loadDispositivos() {
+    const r = await fetch(`/api/graficas/trafico_dispositivos?horas=${horas}`);
+    const d = await r.json();
+
+    const cfg = {
+      type: 'bar',
+      data: {
+        labels: d.labels,
+        datasets: [
+          {
+            label: 'Bajada (MB)',
+            data: d.bajada,
+            backgroundColor: d.labels.map((_, i) => COLORS[i % COLORS.length] + 'CC'),
+            borderColor: d.labels.map((_, i) => COLORS[i % COLORS.length]),
+            borderWidth: 1
+          },
+          {
+            label: 'Subida (MB)',
+            data: d.subida,
+            backgroundColor: d.labels.map((_, i) => COLORS[i % COLORS.length] + '55'),
+            borderColor: d.labels.map((_, i) => COLORS[i % COLORS.length]),
+            borderWidth: 1,
+            borderDash: [4, 4]
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'top' } },
+        scales: {
+          x: { ticks: { font: { size: 10 } } },
+          y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+        }
+      }
+    };
+
+    if (chartDisp) chartDisp.destroy();
+    chartDisp = new Chart(document.getElementById('chartDispositivos'), cfg);
+  }
+
+  function loadAll() {
+    loadTraficoTotal();
+    loadDNS();
+    loadDispositivos();
+    document.getElementById('last-update').textContent =
+      'Actualizado: ' + new Date().toLocaleTimeString('es-ES');
+  }
+
+  loadAll();
+  setInterval(loadAll, 60000);
+</script>
+
+</body>
+</html>

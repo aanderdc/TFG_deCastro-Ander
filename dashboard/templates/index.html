@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.I.E.M. - Ander de Castro</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-dark: #0f172a;
+            --accent-blue: #334155;
+            --bg-light: #f8fafc;
+        }
+
+        body { 
+            background-color: var(--bg-light); 
+            color: #334155;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        .header-bar {
+            background-color: var(--primary-dark);
+            color: white;
+            padding: 1.2rem 0;
+            border-bottom: 3px solid #334155;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .label {
+            color: #64748b;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+        }
+
+        .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .nav-btn {
+            background-color: white;
+            color: var(--primary-dark);
+            text-decoration: none;
+            padding: 0.8rem;
+            border-radius: 8px;
+            display: block;
+            text-align: center;
+            font-weight: 600;
+            border: 2px solid #e2e8f0;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover {
+            background-color: var(--primary-dark);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+
+
+        .table-container {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            border: 1px solid #e2e8f0;
+            margin-top: 2rem;
+        }
+
+        .badge-proto {
+            background-color: #e2e8f0;
+            color: #475569;
+            font-size: 0.7rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        /* Sniffer preview */
+        .sniffer-preview {
+            background: #0a0c0f;
+            border-radius: 10px;
+            border: 1px solid #1e2530;
+            margin-top: 2rem;
+            overflow: hidden;
+        }
+
+        .sniffer-header {
+            background: #111418;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #1e2530;
+        }
+
+        .sniffer-title {
+            color: #00ff88;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .sniffer-title .dot {
+            display: inline-block;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #00ff88;
+            margin-right: 8px;
+            animation: blink 1.2s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.2; }
+        }
+
+        .sniffer-body {
+            padding: 0;
+            overflow-x: auto;
+        }
+
+        .sniffer-body table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'Courier New', monospace;
+            font-size: 0.72rem;
+        }
+
+        .sniffer-body thead tr {
+            border-bottom: 1px solid #1e2530;
+        }
+
+        .sniffer-body th {
+            padding: 8px 14px;
+            color: #4a5568;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            white-space: nowrap;
+        }
+
+        .sniffer-body tbody tr {
+            border-bottom: 1px solid rgba(30,37,48,0.4);
+            transition: background 0.1s;
+        }
+
+        .sniffer-body tbody tr:hover { background: rgba(255,255,255,0.03); }
+
+        .sniffer-body td {
+            padding: 6px 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+
+        .s-num    { color: #4a5568; }
+        .s-time   { color: #ffcc00; }
+        .s-src    { color: #00ff88; }
+        .s-dst    { color: #00d4ff; }
+        .s-info   { color: #c8d8e8; opacity: 0.7; max-width: 280px; }
+
+        .s-proto {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .s-dns  { background: rgba(179,136,255,0.15); color: #b388ff; border: 1px solid rgba(179,136,255,0.3); }
+        .s-http { background: rgba(0,212,255,0.12);   color: #00d4ff; border: 1px solid rgba(0,212,255,0.3); }
+        .s-tcp  { background: rgba(0,255,136,0.10);   color: #00ff88; border: 1px solid rgba(0,255,136,0.25); }
+        .s-udp  { background: rgba(255,204,0,0.12);   color: #ffcc00; border: 1px solid rgba(255,204,0,0.3); }
+        .s-other{ background: rgba(255,255,255,0.05); color: #4a5568; border: 1px solid #1e2530; }
+
+        .sniffer-footer {
+            padding: 10px 20px;
+            border-top: 1px solid #1e2530;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sniffer-footer a {
+            color: #00ff88;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            text-decoration: none;
+            letter-spacing: 0.5px;
+        }
+        .sniffer-footer a:hover { text-decoration: underline; }
+        .sniffer-count { color: #4a5568; font-family: 'Courier New', monospace; font-size: 0.72rem; }
+    </style>
+</head>
+<body>
+
+<div class="header-bar text-center" style="position:relative;">
+    <div class="container">
+        <h3 class="mb-1 fw-bold">SISTEMA DE SEGURIDAD DE RED</h3>
+        <p class="mb-0 text-uppercase" style="font-size: 0.8rem; color: #94a3b8; letter-spacing: 2px;">TFG - Ander de Castro</p>
+    </div>
+    <a href="/logout" style="position:absolute;top:50%;right:24px;transform:translateY(-50%);
+        color:#94a3b8;font-size:0.75rem;font-weight:600;text-decoration:none;
+        border:1px solid #334155;padding:6px 14px;border-radius:6px;
+        text-transform:uppercase;letter-spacing:1px;transition:all 0.2s;"
+        onmouseover="this.style.color='#fff';this.style.borderColor='#ef4444'"
+        onmouseout="this.style.color='#94a3b8';this.style.borderColor='#334155'">
+        Salir →
+    </a>
+</div>
+
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <span class="badge bg-success">MONITORIZACIÓN ACTIVA</span>
+        <div class="text-muted small">Última Sincronización: <span id="last_update" class="fw-bold">--:--:--</span></div>
+    </div>
+
+    <!-- STATS DNS -->
+    <div class="row g-4 text-center">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="label">Consultas DNS</div>
+                <div class="value" id="dns_queries">0</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="label">Amenazas Bloqueadas</div>
+                <div class="value text-danger" id="ads_blocked">0</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="label">Eficiencia Sistema</div>
+                <div class="value text-success" id="ads_percentage">0%</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="label">Dominios en Blacklist</div>
+                <div class="value" id="domains_blocked" style="color: #64748b;">0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACCESOS DIRECTOS -->
+    <h5 class="text-center mt-5 mb-3 text-muted fw-bold text-uppercase" style="font-size: 0.9rem;">Accesos Directos</h5>
+    <div class="row g-3 justify-content-center">
+        <div class="col-md-2"><a href="http://192.168.1.147/admin" target="_blank" class="nav-btn">PI-HOLE</a></div>
+        <div class="col-md-2"><a href="http://192.168.1.147:3000" target="_blank" class="nav-btn">GRAFANA</a></div>
+        <div class="col-md-2"><a href="http://192.168.1.147:3001" target="_blank" class="nav-btn">NTOPNG</a></div>
+        <div class="col-md-2"><a href="http://192.168.1.147:9090" target="_blank" class="nav-btn">PROMETHEUS</a></div>
+        <div class="col-md-2"><a href="/sniffer" class="nav-btn">SNIFFER</a></div>
+        <div class="col-md-2"><a href="/graficas" class="nav-btn">GRÁFICAS</a></div>
+        <div class="col-md-2" style="position:relative;">
+          <a href="/alertas" class="nav-btn" style="border-color:#fca5a5;">ALERTAS</a>
+          <span id="alertas-badge" style="display:none;position:absolute;top:-6px;right:-6px;
+            background:#dc2626;color:white;border-radius:50%;width:20px;height:20px;
+            font-size:0.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;">
+            0
+          </span>
+        </div>
+    </div>
+
+    <!-- TABLA TRAFICO SQLITE -->
+    <div class="table-container">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold mb-0 text-uppercase small text-muted">Dispositivos en Red — Tráfico en Vivo</h6>
+            <span class="text-muted small">Actualizado: <span id="hosts-refresh">—</span></span>
+        </div>
+        <div class="table-responsive">
+            <table class="table align-middle" id="hosts-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>Dispositivo / IP</th>
+                        <th>Fabricante</th>
+                        <th>MAC</th>
+                        <th>Descarga (MB)</th>
+                        <th>Subida (MB)</th>
+                        <th>Flows</th>
+                        <th>Score</th>
+                    </tr>
+                </thead>
+                <tbody id="hosts-tbody">
+                    <tr><td colspan="6" class="text-center text-muted small py-3">Cargando dispositivos...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- SNIFFER PREVIEW -->
+    <div class="sniffer-preview">
+        <div class="sniffer-header">
+            <div class="sniffer-title">
+                <span class="dot"></span>CAPTURA EN VIVO — tshark · wlan0
+            </div>
+            <span style="color:#4a5568;font-family:'Courier New',monospace;font-size:0.7rem;" id="sniff-count">cargando…</span>
+        </div>
+        <div class="sniffer-body">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Tiempo</th>
+                        <th>Origen</th>
+                        <th>Destino</th>
+                        <th>Proto</th>
+                        <th>Info</th>
+                    </tr>
+                </thead>
+                <tbody id="sniffer-tbody">
+                    <tr><td colspan="6" style="color:#4a5568;text-align:center;padding:20px;font-family:'Courier New',monospace;">cargando paquetes…</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="sniffer-footer">
+            <a href="/sniffer">Ver todos los paquetes →</a>
+            <span class="sniffer-count" id="sniff-refresh">—</span>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // --- DNS stats ---
+    async function updateData() {
+        try {
+            const r = await fetch('/api/data');
+            const d = await r.json();
+            document.getElementById('dns_queries').innerText = d.dns_queries_today.toLocaleString();
+            document.getElementById('ads_blocked').innerText = d.ads_blocked_today.toLocaleString();
+            document.getElementById('ads_percentage').innerText = d.ads_percentage_today + '%';
+            document.getElementById('domains_blocked').innerText = d.domains_being_blocked.toLocaleString();
+            document.getElementById('last_update').innerText = d.last_update;
+        } catch (e) { console.log("Error API"); }
+    }
+
+    setInterval(updateData, 5000);
+    updateData();
+    // --- Hosts table refresh ---
+    async function updateHosts() {
+        try {
+            const r = await fetch('/api/hosts');
+            const d = await r.json();
+            if (!d.ok) return;
+
+            const tbody = document.getElementById('hosts-tbody');
+            tbody.innerHTML = d.hosts.map(h => {
+                const score = h.score > 50 
+                    ? `<span class="badge bg-danger">${h.score}</span>`
+                    : h.score > 0 
+                        ? `<span class="badge bg-warning text-dark">${h.score}</span>`
+                        : `<span class="badge bg-light text-dark border">${h.score}</span>`;
+                const fabricante = h.fabricante && h.fabricante !== 'Desconocido'
+                    ? `<span class="badge bg-light text-dark border">${h.fabricante}</span>`
+                    : `<span class="text-muted small">—</span>`;
+                return `<tr>
+                    <td class="fw-bold">${h.name}<br><span class="text-muted small">${h.ip}</span></td>
+                    <td>${fabricante}</td>
+                    <td class="text-muted small">${h.mac}</td>
+                    <td><span class="badge bg-light text-dark border">↓ ${h.rcvd_mb} MB</span></td>
+                    <td><span class="badge bg-light text-dark border">↑ ${h.sent_mb} MB</span></td>
+                    <td class="text-muted small">${h.flows}</td>
+                    <td>${score}</td>
+                </tr>`;
+            }).join('');
+
+            document.getElementById('hosts-refresh').textContent = new Date().toLocaleTimeString('es-ES');
+        } catch(e) { console.log('Error hosts:', e); }
+    }
+
+    setInterval(updateHosts, 15000);
+    updateHosts();
+
+    // --- Alertas badge ---
+    async function updateAlertasBadge() {
+        try {
+            const r = await fetch('/api/alertas?n=1');
+            const d = await r.json();
+            if (!d.ok) return;
+            const badge = document.getElementById('alertas-badge');
+            if (d.no_leidas > 0) {
+                badge.style.display = 'flex';
+                badge.textContent = d.no_leidas > 9 ? '9+' : d.no_leidas;
+            } else {
+                badge.style.display = 'none';
+            }
+        } catch(e) {}
+    }
+    setInterval(updateAlertasBadge, 30000);
+    updateAlertasBadge();
+
+    setTimeout(() => { window.location.reload(); }, 120000);
+
+    // --- Sniffer preview (últimos 15 paquetes) ---
+    function protoClass(p) {
+        p = (p || '').toUpperCase();
+        if (p.includes('DNS'))  return 's-dns';
+        if (p.includes('HTTP')) return 's-http';
+        if (p.includes('TCP'))  return 's-tcp';
+        if (p.includes('UDP'))  return 's-udp';
+        return 's-other';
+    }
+
+    async function updateSniffer() {
+        try {
+            const r = await fetch('/api/sniffer?n=15');
+            const d = await r.json();
+            if (!d.ok) return;
+
+            const tbody = document.getElementById('sniffer-tbody');
+            tbody.innerHTML = d.lineas.map(p => `
+                <tr>
+                    <td class="s-num">${p.num}</td>
+                    <td class="s-time">${p.tiempo}</td>
+                    <td class="s-src">${p.src}</td>
+                    <td class="s-dst">${p.dst}</td>
+                    <td><span class="s-proto ${protoClass(p.protocolo)}">${p.protocolo}</span></td>
+                    <td class="s-info" title="${p.info}">${p.info}</td>
+                </tr>`).join('');
+
+            document.getElementById('sniff-count').textContent = `${d.total} paquetes totales`;
+            document.getElementById('sniff-refresh').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es-ES');
+        } catch(e) {
+            document.getElementById('sniffer-tbody').innerHTML =
+                '<tr><td colspan="6" style="color:#4a5568;text-align:center;padding:16px;font-family:Courier New,monospace;">Sin datos — comprueba tshark-sflow</td></tr>';
+        }
+    }
+
+    setInterval(updateSniffer, 8000);
+    updateSniffer();
+</script>
+</body>
+</html>

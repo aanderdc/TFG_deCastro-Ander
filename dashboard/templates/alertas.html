@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alertas — S.I.E.M.</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root { --primary-dark: #0f172a; --bg-light: #f8fafc; }
+    body { background-color: var(--bg-light); color: #334155; font-family: 'Segoe UI', sans-serif; }
+    .header-bar {
+      background-color: var(--primary-dark);
+      color: white;
+      padding: 1.2rem 0;
+      border-bottom: 3px solid #334155;
+      margin-bottom: 2rem;
+      position: relative;
+    }
+    .nav-btn {
+      background-color: white;
+      color: var(--primary-dark);
+      text-decoration: none;
+      padding: 0.8rem;
+      border-radius: 8px;
+      display: inline-block;
+      text-align: center;
+      font-weight: 600;
+      border: 2px solid #e2e8f0;
+      transition: all 0.2s;
+      font-size: 0.85rem;
+    }
+    .nav-btn:hover { background-color: var(--primary-dark); color: white; }
+    .stat-card {
+      background: white;
+      border-radius: 10px;
+      padding: 1.2rem 1.5rem;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .label { color: #64748b; text-transform: uppercase; font-size: 0.7rem; font-weight: 800; }
+    .value { font-size: 1.8rem; font-weight: 700; color: #1e293b; }
+    .table-container {
+      background: white;
+      border-radius: 10px;
+      padding: 1.5rem;
+      border: 1px solid #e2e8f0;
+      margin-top: 1.5rem;
+    }
+    .badge-critica { background: #dc2626; color: white; }
+    .badge-alta    { background: #ea580c; color: white; }
+    .badge-media   { background: #ca8a04; color: white; }
+    .badge-baja    { background: #16a34a; color: white; }
+    .badge-tipo {
+      font-size: 0.65rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+      background: #e2e8f0;
+      color: #475569;
+    }
+    .row-critica { border-left: 4px solid #dc2626; }
+    .row-alta    { border-left: 4px solid #ea580c; }
+    .row-media   { border-left: 4px solid #ca8a04; }
+    .live-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      margin-right: 6px;
+      animation: blink 1.2s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+  </style>
+</head>
+<body>
+
+<div class="header-bar text-center">
+  <div class="container">
+    <h3 class="mb-1 fw-bold">ALERTAS DE SEGURIDAD</h3>
+    <p class="mb-0 text-uppercase" style="font-size:0.8rem;color:#94a3b8;letter-spacing:2px;">TFG — Ander de Castro</p>
+  </div>
+  <a href="/logout" style="position:absolute;top:50%;right:24px;transform:translateY(-50%);
+      color:#94a3b8;font-size:0.75rem;font-weight:600;text-decoration:none;
+      border:1px solid #334155;padding:6px 14px;border-radius:6px;
+      text-transform:uppercase;letter-spacing:1px;"
+      onmouseover="this.style.color='#fff';this.style.borderColor='#ef4444'"
+      onmouseout="this.style.color='#94a3b8';this.style.borderColor='#334155'">
+      Salir →
+  </a>
+</div>
+
+<div class="container">
+
+  <!-- NAV -->
+  <div class="d-flex gap-2 mb-4 flex-wrap">
+    <a href="/" class="nav-btn">Dashboard</a>
+    <a href="/sniffer" class="nav-btn">Sniffer</a>
+    <a href="/graficas" class="nav-btn">Gráficas</a>
+    <a href="/alertas" class="nav-btn" style="background:var(--primary-dark);color:white;">Alertas</a>
+  </div>
+
+  <!-- STATS -->
+  <div class="row g-3 mb-2">
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="label">Total Alertas</div>
+        <div class="value">{{ total }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="label">Críticas</div>
+        <div class="value text-danger">{{ criticas }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="label">Altas</div>
+        <div class="value" style="color:#ea580c;">{{ altas }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="label">Últimas 5 min</div>
+        <div class="value text-success" id="stat-recientes">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLA -->
+  <div class="table-container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <span class="live-dot"></span>
+        <span class="fw-bold small text-uppercase" style="font-size:0.75rem;letter-spacing:1px;">
+          Registro de Alertas
+        </span>
+        <span class="text-muted small ms-2" id="last-refresh">—</span>
+      </div>
+      <button onclick="limpiarAlertas()" class="btn btn-sm btn-outline-danger">
+        Limpiar todas
+      </button>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table align-middle" id="alertas-table">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>Fecha</th>
+            <th>Tipo</th>
+            <th>IP</th>
+            <th>Descripción</th>
+            <th>Severidad</th>
+          </tr>
+        </thead>
+        <tbody id="alertas-tbody">
+          {% for a in alertas %}
+          <tr class="row-{{ a[5]|lower }}">
+            <td class="text-muted small">{{ a[0] }}</td>
+            <td class="small">{{ a[1] }}</td>
+            <td><span class="badge-tipo">{{ a[2] }}</span></td>
+            <td class="fw-bold small">{{ a[3] }}</td>
+            <td class="small">{{ a[4] }}</td>
+            <td>
+              <span class="badge badge-{{ a[5]|lower }}">{{ a[5] }}</span>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-4">
+              No hay alertas registradas todavía. Se generarán automáticamente cada 30s.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  async function refreshAlertas() {
+    try {
+      const r = await fetch('/api/alertas?n=100');
+      const d = await r.json();
+      if (!d.ok) return;
+
+      document.getElementById('stat-recientes').textContent = d.no_leidas;
+
+      const tbody = document.getElementById('alertas-tbody');
+      if (d.alertas.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No hay alertas registradas todavía.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = d.alertas.map(a => {
+        const sev = a.severidad.toLowerCase();
+        const badgeClass = sev === 'critica' ? 'badge-critica'
+                         : sev === 'alta'    ? 'badge-alta'
+                         : sev === 'media'   ? 'badge-media'
+                         : 'badge-baja';
+        return `<tr class="row-${sev}">
+          <td class="text-muted small">${a.id}</td>
+          <td class="small">${a.fecha}</td>
+          <td><span class="badge-tipo">${a.tipo}</span></td>
+          <td class="fw-bold small">${a.ip}</td>
+          <td class="small">${a.descripcion}</td>
+          <td><span class="badge ${badgeClass}">${a.severidad}</span></td>
+        </tr>`;
+      }).join('');
+
+      document.getElementById('last-refresh').textContent =
+        'Actualizado: ' + new Date().toLocaleTimeString('es-ES');
+    } catch(e) { console.error(e); }
+  }
+
+  async function limpiarAlertas() {
+    if (!confirm('¿Borrar todas las alertas?')) return;
+    await fetch('/api/alertas/clear', { method: 'POST' });
+    refreshAlertas();
+  }
+
+  refreshAlertas();
+  setInterval(refreshAlertas, 15000);
+</script>
+
+</body>
+</html>

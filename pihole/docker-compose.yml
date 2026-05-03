@@ -1,0 +1,149 @@
+services:
+  pihole:
+    container_name: pihole
+    image: pihole/pihole:latest
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "80:80/tcp"
+    environment:
+      TZ: 'Europe/Madrid'
+      WEBPASSWORD: '***REMOVED***'
+    volumes:
+      - './etc-pihole:/etc/pihole'
+      - './etc-dnsmasq.d:/etc/dnsmasq.d'
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  pihole-exporter:
+    container_name: pihole-exporter
+    image: ekofr/pihole-exporter:latest
+    ports:
+      - "9167:9167"
+    environment:
+      - PIHOLE_PROTOCOL=http
+      - PIHOLE_HOSTNAME=pihole
+      - PIHOLE_PASSWORD=***REMOVED***
+      - PIHOLE_PORT=80
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana-oss:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=***REMOVED***
+    volumes:
+      - ./grafana_data:/var/lib/grafana
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    container_name: redis-ntopng
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - ./ntopng_redis:/data
+    command: redis-server --save "" --appendonly no
+
+  ntopng:
+    image: ntop/ntopng_arm64.dev:latest
+    container_name: ntopng
+    restart: unless-stopped
+    network_mode: "host"
+    privileged: true
+    environment:
+      - TZ=Europe/Madrid
+    volumes:
+      - ./ntopng_data:/var/lib/ntopng
+      - ./ntopng_redis:/var/lib/redis
+    command: ntopng -i wlan0 -w 3001 --community --disable-login=1 -r 127.0.0.1
+    depends_on:
+      - redis
+
+  tshark-sflow:
+    image: ubuntu:22.04
+    container_name: tshark-sflow
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - /home/***REMOVED***/tfg_red/pihole/tshark_logs:/logs
+    command: >
+      bash -c "apt-get update -qq && apt-get install -y -qq tshark &&
+      touch /logs/tshark_capture.txt && chmod 666 /logs/tshark_capture.txt &&
+      tshark -i wlan0 -s 1600 -l >> /logs/tshark_capture.txt 2>&1"
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-siem
+    network_mode: "host"
+    restart: unless-stopped
+    volumes:
+      - ./nginx/siem.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx/certs:/etc/nginx/certs
+
+  dashboard:
+    image: python:3.9-slim
+    container_name: mi_dashboard
+    network_mode: "host"
+    restart: unless-stopped
+    volumes:
+      - /home/***REMOVED***/tfg_red/dashboard:/app
+      - /home/***REMOVED***/tfg_red/pihole/tshark_logs:/tshark_logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /app
+    command: >
+      sh -c "pip show flask > /dev/null 2>&1 || pip install -q flask requests pytz docker && python app.py"
+    depends_on:
+      - pihole
+
+  wireguard:
+    image: linuxserver/wireguard:latest
+    container_name: wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+      - SERVERURL=192.168.1.147
+      - PEERS=3
+      - PEERDNS=192.168.1.147
+      - ALLOWEDIPS=0.0.0.0/0
+    ports:
+      - 51820:51820/udp
+    volumes:
+      - /home/***REMOVED***/tfg_red/wireguard_config:/config
+      - /lib/modules:/lib/modules
+    restart: unless-stopped
+
+networks:
+  monitoring:
+    driver: bridge

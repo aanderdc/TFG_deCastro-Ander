@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sniffer — TFG Red Monitor</title>
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:        #0a0c0f;
+      --surface:   #111418;
+      --border:    #1e2530;
+      --green:     #00ff88;
+      --green-dim: #00cc6a;
+      --cyan:      #00d4ff;
+      --yellow:    #ffcc00;
+      --red:       #ff4455;
+      --purple:    #b388ff;
+      --text:      #c8d8e8;
+      --muted:     #4a5568;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      min-height: 100vh;
+    }
+
+    /* Scanline overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,255,136,0.015) 2px,
+        rgba(0,255,136,0.015) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* NAV */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 28px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(10,12,15,0.95);
+      backdrop-filter: blur(10px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-brand {
+      font-family: 'Syne', sans-serif;
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--green);
+      letter-spacing: -0.5px;
+    }
+
+    .nav-brand span { color: var(--cyan); }
+
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      margin-left: 24px;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover, .nav-links a.active { color: var(--green); }
+
+    /* HEADER */
+    .page-header {
+      padding: 32px 28px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .page-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1;
+    }
+
+    .page-title .tag {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--green);
+      background: rgba(0,255,136,0.1);
+      border: 1px solid rgba(0,255,136,0.3);
+      padding: 3px 8px;
+      border-radius: 3px;
+      margin-left: 12px;
+      vertical-align: middle;
+      animation: pulse-border 2s infinite;
+    }
+
+    @keyframes pulse-border {
+      0%, 100% { border-color: rgba(0,255,136,0.3); }
+      50%       { border-color: rgba(0,255,136,0.8); }
+    }
+
+    .stats-bar {
+      display: flex;
+      gap: 20px;
+      font-size: 12px;
+    }
+
+    .stat-item { color: var(--muted); }
+    .stat-item strong { color: var(--cyan); }
+
+    /* CONTROLS */
+    .controls {
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .controls label {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .controls input, .controls select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 4px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .controls input:focus, .controls select:focus {
+      border-color: var(--green);
+    }
+
+    .controls input { width: 200px; }
+
+    .btn {
+      background: rgba(0,255,136,0.1);
+      border: 1px solid var(--green);
+      color: var(--green);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      background: rgba(0,255,136,0.2);
+      box-shadow: 0 0 12px rgba(0,255,136,0.3);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--muted);
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--muted);
+      color: var(--text);
+      box-shadow: none;
+    }
+
+    .btn-auto {
+      background: rgba(0,212,255,0.1);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+    .btn-auto.active, .btn-auto:hover {
+      background: rgba(0,212,255,0.2);
+      box-shadow: 0 0 12px rgba(0,212,255,0.3);
+    }
+
+    .btn-danger {
+      background: rgba(255,68,85,0.1);
+      border-color: var(--red);
+      color: var(--red);
+    }
+    .btn-danger:hover {
+      background: rgba(255,68,85,0.2);
+      box-shadow: 0 0 12px rgba(255,68,85,0.3);
+    }
+    .btn-yellow {
+      background: rgba(255,204,0,0.1);
+      border-color: var(--yellow);
+      color: var(--yellow);
+    }
+    .btn-yellow:hover {
+      background: rgba(255,204,0,0.2);
+      box-shadow: 0 0 12px rgba(255,204,0,0.3);
+    }
+    .status-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .status-running { background: var(--green); animation: blink 1.2s infinite; }
+    .status-stopped { background: var(--red); }
+    .controls-sep {
+      width: 1px; height: 24px;
+      background: var(--border);
+      margin: 0 4px;
+    }
+
+    /* ERROR */
+    .error-box {
+      margin: 24px 28px;
+      padding: 16px 20px;
+      background: rgba(255,68,85,0.1);
+      border: 1px solid rgba(255,68,85,0.4);
+      border-radius: 6px;
+      color: var(--red);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* TABLE */
+    .table-wrap {
+      padding: 20px 28px;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead tr {
+      border-bottom: 2px solid var(--border);
+    }
+
+    th {
+      text-align: left;
+      padding: 8px 12px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid rgba(30,37,48,0.5);
+      transition: background 0.1s;
+      animation: row-in 0.3s ease both;
+    }
+
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+
+    @keyframes row-in {
+      from { opacity: 0; transform: translateX(-8px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    td {
+      padding: 7px 12px;
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 220px;
+    }
+
+    .col-num    { color: var(--muted); width: 60px; }
+    .col-time   { color: var(--yellow); }
+    .col-src    { color: var(--green); }
+    .col-dst    { color: var(--cyan); }
+    .col-len    { color: var(--muted); text-align: right; width: 60px; }
+    .col-info   { color: var(--text); opacity: 0.8; max-width: 340px; }
+
+    /* FILA EXPANDIBLE */
+    tbody tr.data-row { cursor: pointer; }
+    tbody tr.data-row:hover .col-info { opacity: 1; color: var(--green); }
+
+    tr.expand-row td {
+      padding: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .expand-content {
+      display: none;
+      padding: 10px 16px;
+      background: rgba(0,255,136,0.04);
+      border-left: 3px solid var(--green);
+      color: var(--text);
+      font-size: 12px;
+      word-break: break-all;
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+    tr.expand-row.open .expand-content {
+      display: block;
+    }
+
+    /* PROTOCOL BADGES */
+    .proto {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .proto-dns  { background: rgba(179,136,255,0.15); color: var(--purple); border: 1px solid rgba(179,136,255,0.3); }
+    .proto-http { background: rgba(0,212,255,0.12);   color: var(--cyan);   border: 1px solid rgba(0,212,255,0.3); }
+    .proto-tcp  { background: rgba(0,255,136,0.10);   color: var(--green);  border: 1px solid rgba(0,255,136,0.25); }
+    .proto-udp  { background: rgba(255,204,0,0.12);   color: var(--yellow); border: 1px solid rgba(255,204,0,0.3); }
+    .proto-arp  { background: rgba(255,68,85,0.12);   color: var(--red);    border: 1px solid rgba(255,68,85,0.3); }
+    .proto-other{ background: rgba(255,255,255,0.05); color: var(--muted);  border: 1px solid var(--border); }
+
+    /* EMPTY */
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+    }
+    .empty .icon { font-size: 40px; margin-bottom: 12px; }
+    .empty p { font-size: 13px; }
+
+    /* FOOTER */
+    .footer {
+      padding: 16px 28px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    #last-refresh { color: var(--green-dim); }
+
+    /* Auto-refresh indicator */
+    .live-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      margin-right: 6px;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.2; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">S<span>.</span>I<span>.</span>E<span>.</span>M<span>.</span></div>
+  <div class="nav-links">
+    <a href="/">Dashboard</a>
+    <a href="/sniffer" class="active">Sniffer</a>
+    <a href="/graficas">Gráficas</a>
+    <a href="/alertas">Alertas</a>
+    <a href="/logout">Salir</a>
+  </div>
+</nav>
+
+<div class="page-header">
+  <div>
+    <div class="page-title">
+      Captura de Paquetes
+      <span class="tag" id="live-tag">● LIVE</span>
+    </div>
+    <div style="color:var(--muted);font-size:11px;margin-top:6px;">
+      tshark · wlan0 · http + dns
+    </div>
+  </div>
+  <div class="stats-bar">
+    <div class="stat-item">Total líneas: <strong>{{ total }}</strong></div>
+    <div class="stat-item">Mostrando: <strong>{{ lineas|length }}</strong></div>
+    {% if filtro %}
+    <div class="stat-item">Filtro: <strong style="color:var(--yellow)">{{ filtro }}</strong></div>
+    {% endif %}
+  </div>
+</div>
+
+<form method="get" action="/sniffer">
+  <div class="controls">
+    <label>Mostrar</label>
+    <select name="n" onchange="this.form.submit()">
+      {% for val in [50, 100, 200, 500] %}
+      <option value="{{ val }}" {% if val == n %}selected{% endif %}>{{ val }} líneas</option>
+      {% endfor %}
+    </select>
+
+    <label>Filtro</label>
+    <input type="text" name="filtro" value="{{ filtro }}" placeholder="ej: DNS, 192.168., google…">
+
+    <button type="submit" class="btn">Aplicar</button>
+    <a href="/sniffer" class="btn btn-ghost">Limpiar filtro</a>
+    <button type="button" class="btn btn-auto" id="btn-auto" onclick="toggleAuto()">
+      Auto-refresh OFF
+    </button>
+
+    <div class="controls-sep"></div>
+
+    <span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.08em;">Tshark</span>
+    <span id="tshark-status-badge"><span class="status-dot"></span><span style="color:var(--muted);font-size:11px">...</span></span>
+    <button type="button" class="btn" id="btn-start" onclick="tsharkControl('start')">▶ Iniciar</button>
+    <button type="button" class="btn btn-danger" id="btn-stop" onclick="tsharkControl('stop')">■ Parar</button>
+    <button type="button" class="btn btn-yellow" onclick="tsharkControl('clear')">⌫ Limpiar</button>
+    <a href="/api/tshark/download" class="btn btn-ghost">↓ Descargar</a>
+  </div>
+</form>
+
+{% if error %}
+<div class="error-box">
+  ⚠ {{ error }}
+</div>
+{% elif lineas %}
+<div class="table-wrap">
+  <table id="packet-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Tiempo</th>
+        <th>Origen</th>
+        <th>Destino</th>
+        <th>Protocolo</th>
+        <th style="text-align:right">Len</th>
+        <th>Info</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in lineas %}
+      <tr class="data-row" onclick="toggleRow(this)">
+        <td class="col-num">{{ p.num }}</td>
+        <td class="col-time">{{ p.tiempo }}</td>
+        <td class="col-src">{{ p.src }}</td>
+        <td class="col-dst">{{ p.dst }}</td>
+        <td>
+          {% set proto = p.protocolo|upper %}
+          {% if 'DNS' in proto %}
+            <span class="proto proto-dns">{{ p.protocolo }}</span>
+          {% elif 'HTTP' in proto %}
+            <span class="proto proto-http">{{ p.protocolo }}</span>
+          {% elif 'TCP' in proto %}
+            <span class="proto proto-tcp">{{ p.protocolo }}</span>
+          {% elif 'UDP' in proto %}
+            <span class="proto proto-udp">{{ p.protocolo }}</span>
+          {% elif 'ARP' in proto %}
+            <span class="proto proto-arp">{{ p.protocolo }}</span>
+          {% else %}
+            <span class="proto proto-other">{{ p.protocolo }}</span>
+          {% endif %}
+        </td>
+        <td class="col-len">{{ p.len }}</td>
+        <td class="col-info">{{ p.info[:60] }}{% if p.info|length > 60 %}…{% endif %}</td>
+      </tr>
+      <tr class="expand-row">
+        <td colspan="7">
+          <div class="expand-content">{{ p.info }}</div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  <div class="icon">📡</div>
+  <p>No hay paquetes capturados todavía.<br>Asegúrate de que tshark-sflow está corriendo.</p>
+</div>
+{% endif %}
+
+<div class="footer">
+  <div>
+    <span class="live-dot" id="live-indicator" style="display:none"></span>
+    <span id="auto-status">Auto-refresh desactivado</span>
+  </div>
+  <div>Última actualización: <span id="last-refresh">{{ now if now else '—' }}</span></div>
+</div>
+
+<script>
+  let autoInterval = null;
+  let autoActive = false;
+
+  function toggleRow(row) {
+    const expandRow = row.nextElementSibling;
+    expandRow.classList.toggle('open');
+  }
+
+  function toggleAuto() {
+    autoActive = !autoActive;
+    const btn = document.getElementById('btn-auto');
+    const dot = document.getElementById('live-indicator');
+    const status = document.getElementById('auto-status');
+
+    if (autoActive) {
+      btn.textContent = 'Auto-refresh ON';
+      btn.classList.add('active');
+      dot.style.display = 'inline-block';
+      status.textContent = 'Actualizando cada 5s…';
+      autoInterval = setInterval(fetchPackets, 5000);
+    } else {
+      btn.textContent = 'Auto-refresh OFF';
+      btn.classList.remove('active');
+      dot.style.display = 'none';
+      status.textContent = 'Auto-refresh desactivado';
+      clearInterval(autoInterval);
+    }
+  }
+
+  function protoClass(p) {
+    p = (p || '').toUpperCase();
+    if (p.includes('DNS'))  return 'proto-dns';
+    if (p.includes('HTTP')) return 'proto-http';
+    if (p.includes('TCP'))  return 'proto-tcp';
+    if (p.includes('UDP'))  return 'proto-udp';
+    if (p.includes('ARP'))  return 'proto-arp';
+    return 'proto-other';
+  }
+
+  function fetchPackets() {
+    const n = document.querySelector('select[name="n"]').value;
+    const filtro = document.querySelector('input[name="filtro"]').value;
+    fetch(`/api/sniffer?n=${n}&filtro=${encodeURIComponent(filtro)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (!data.ok) return;
+        const tbody = document.querySelector('#packet-table tbody');
+        if (!tbody) { location.reload(); return; }
+
+        tbody.innerHTML = data.lineas.map((p, i) => {
+          const short = p.info.length > 60 ? p.info.slice(0, 60) + '…' : p.info;
+          return `
+            <tr class="data-row" onclick="toggleRow(this)" style="animation-delay:${i*10}ms">
+              <td class="col-num">${p.num}</td>
+              <td class="col-time">${p.tiempo}</td>
+              <td class="col-src">${p.src}</td>
+              <td class="col-dst">${p.dst}</td>
+              <td><span class="proto ${protoClass(p.protocolo)}">${p.protocolo}</span></td>
+              <td class="col-len">${p.len}</td>
+              <td class="col-info">${short}</td>
+            </tr>
+            <tr class="expand-row">
+              <td colspan="7"><div class="expand-content">${p.info}</div></td>
+            </tr>`;
+        }).join('');
+
+        document.getElementById('last-refresh').textContent = new Date().toLocaleTimeString('es-ES');
+      })
+      .catch(e => console.error('Error fetch:', e));
+  }
+
+  // --- TSHARK CONTROL ---
+  function updateTsharkStatus() {
+    fetch('/api/tshark/status')
+      .then(r => r.json())
+      .then(d => {
+        const badge = document.getElementById('tshark-status-badge');
+        const running = d.ok && d.status === 'running';
+        badge.innerHTML = running
+          ? '<span class="status-dot status-running"></span><span style="color:var(--green);font-size:11px">RUNNING</span>'
+          : '<span class="status-dot status-stopped"></span><span style="color:var(--red);font-size:11px">STOPPED</span>';
+        document.getElementById('btn-start').disabled = running;
+        document.getElementById('btn-stop').disabled = !running;
+      })
+      .catch(() => {});
+  }
+
+  function tsharkControl(action) {
+    if (action === 'clear') {
+      if (!confirm('¿Borrar todo el contenido del archivo de captura?')) return;
+    }
+    const method = action === 'clear' ? 'POST' : 'POST';
+    fetch(`/api/tshark/${action}`, { method })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) {
+          if (action === 'clear') {
+            alert('Archivo limpiado correctamente');
+            location.reload();
+          } else {
+            setTimeout(updateTsharkStatus, 1000);
+          }
+        } else {
+          alert('Error: ' + (d.error || 'desconocido'));
+        }
+      })
+      .catch(e => alert('Error: ' + e));
+  }
+
+  // Estado inicial y refresco cada 10s
+  updateTsharkStatus();
+  setInterval(updateTsharkStatus, 10000);
+</script>
+
+</body>
+</html>
