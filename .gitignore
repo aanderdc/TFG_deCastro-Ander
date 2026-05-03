@@ -1,0 +1,7 @@
+wireguard_config/wg_confs/
+wireguard_config/peer1/
+wireguard_config/peer2/
+wireguard_config/peer3/
+wireguard_config/templates/
+pihole/nginx/certs/siem.key
+pihole/etc-pihole/tls.pem
