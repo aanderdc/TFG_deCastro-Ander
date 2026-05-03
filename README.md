@@ -181,4 +181,4 @@ TFG_deCastro-Ander/
 ## Licencia
 
 Proyecto académico desarrollado como Trabajo de Fin de Grado.  
-Universidad del País Vasco / Euskal Herriko Unibertsitatea (UPV/EHU).
+
