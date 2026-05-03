@@ -8,3 +8,6 @@ wireguard_config/server/
 pihole/nginx/certs/siem.key
 pihole/etc-pihole/tls.pem
 pihole/.env
+pihole/etc-pihole/gravity.db
+pihole/etc-pihole/gravity_old.db
+pihole/tshark_logs/tshark_capture.txt
