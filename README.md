@@ -309,7 +309,7 @@ Verás el panel de control con métricas en tiempo real.
 ```bash
 docker logs nombre_del_contenedor
 ```
-Esto muestra el error. Los más comunes están documentados en el Anexo III de la memoria.
+Esto muestra el error. Los más comunes están documentados en el Anexo III de la memoria del TFG.
 
 **No puedo acceder al dashboard**  
 Comprueba que estás en la misma red Wi-Fi que la Raspberry Pi.
