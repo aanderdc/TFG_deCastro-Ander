@@ -177,6 +177,146 @@ TFG_deCastro-Ander/
 | Coste energético anual (24/7) | < 20 € |
 
 ---
+## Guía para usuarios sin experiencia técnica
+
+Si nunca has usado una Raspberry Pi, Linux o Docker, esta sección es para ti.
+Sigue los pasos en orden y tendrás el sistema funcionando.
+
+### ¿Qué necesitas?
+
+- Una Raspberry Pi 4 (4 GB RAM recomendados) — precio aproximado: 60-70 €
+- Una tarjeta microSD de al menos 16 GB
+- Cable de red (Ethernet) para conectar la Raspberry Pi al router
+- Un ordenador para los primeros pasos
+
+---
+
+### Paso 1 — Instalar el sistema operativo en la Raspberry Pi
+
+1. Descarga **Raspberry Pi Imager** en tu ordenador:  
+   https://www.raspberrypi.com/software/
+2. Inserta la tarjeta microSD en tu ordenador.
+3. Abre Raspberry Pi Imager, selecciona:
+   - **Dispositivo:** Raspberry Pi 4
+   - **Sistema operativo:** Raspberry Pi OS (64-bit)
+   - **Almacenamiento:** tu tarjeta microSD
+4. Haz clic en **Escribir** y espera a que termine.
+5. Inserta la microSD en la Raspberry Pi, conecta el cable de red y enchúfala.
+
+---
+
+### Paso 2 — Conectarte a la Raspberry Pi
+
+Desde tu ordenador, abre una terminal:
+- **Windows:** busca "PowerShell" en el menú inicio
+- **Mac/Linux:** abre "Terminal"
+
+Escribe:
+```bash
+ssh pi@raspberrypi.local
+```
+La contraseña por defecto es `raspberry`. Cámbiala cuando te lo pida.
+
+> Si no funciona, prueba con la IP de tu Raspberry Pi en lugar de `raspberrypi.local`.  
+> Puedes verla en la pantalla de tu router (suele ser algo como `192.168.1.X`).
+
+---
+
+### Paso 3 — Instalar Docker
+
+Copia y pega estos comandos uno a uno en la terminal:
+
+```bash
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker $USER
+```
+
+Cierra la terminal y vuelve a conectarte para que los cambios surtan efecto.
+
+---
+
+### Paso 4 — Descargar y configurar el proyecto
+
+```bash
+git clone https://github.com/a***REMOVED***dc/TFG_deCastro-Ander.git
+cd TFG_deCastro-Ander/pihole
+cp .env.example .env
+```
+
+Ahora abre el archivo `.env` para poner tus contraseñas:
+
+```bash
+nano .env
+```
+
+Verás algo así:
+PIHOLE_PASSWORD=tu_contraseña_segura
+GRAFANA_PASSWORD=tu_contraseña_segura
+WIREGUARD_SERVERURL=tu_ip_local
+- Sustituye `tu_contraseña_segura` por una contraseña de tu elección.
+- Sustituye `tu_ip_local` por la IP de tu Raspberry Pi (ej: `192.168.1.100`).
+- Para guardar: pulsa `Ctrl+O`, luego `Enter`, luego `Ctrl+X` para salir.
+
+---
+
+### Paso 5 — Arrancar el sistema
+
+```bash
+docker compose up -d
+```
+
+Espera 1-2 minutos y comprueba que todo funciona:
+
+```bash
+docker ps
+```
+
+Deberías ver 11 contenedores en estado **Up**. Si alguno aparece como **Exited**,
+consulta la sección [Resolución de problemas](#resolución-de-problemas-frecuentes).
+
+---
+
+### Paso 6 — Configurar el DNS en tu router
+
+Este es el paso más importante: decirle a tu red que use la Raspberry Pi como servidor DNS.
+
+1. Abre tu navegador y ve a la dirección de tu router  
+   (normalmente `192.168.1.1` o `192.168.0.1`).
+2. Entra con tu usuario y contraseña (suelen estar en la pegatina del router).
+3. Busca la sección **DHCP** o **DNS**.
+4. Cambia el **DNS primario** por la IP de tu Raspberry Pi (ej: `192.168.1.100`).
+5. Guarda los cambios y reinicia el router.
+
+> A partir de este momento, todo el tráfico DNS de tu red pasará por Pi-hole.
+
+---
+
+### Paso 7 — Acceder al dashboard
+
+Abre tu navegador y ve a: https://IP_DE_TU_RASPBERRY
+
+Acepta el aviso de certificado (es autofirmado, es normal).  
+Verás el panel de control con métricas en tiempo real.
+
+---
+
+### Resolución de problemas frecuentes
+
+**Un contenedor aparece como Exited**
+```bash
+docker logs nombre_del_contenedor
+```
+Esto muestra el error. Los más comunes están documentados en el Anexo III de la memoria.
+
+**No puedo acceder al dashboard**  
+Comprueba que estás en la misma red Wi-Fi que la Raspberry Pi.
+
+**Pi-hole no bloquea nada**  
+Verifica que el DNS de tu router apunta a la IP correcta de la Raspberry Pi (Paso 6).
+
+**Olvidé la contraseña del dashboard**  
+Edita el archivo `.env`, cambia `PIHOLE_PASSWORD` y reinicia con `docker compose restart`.
 
 ## Licencia
 
