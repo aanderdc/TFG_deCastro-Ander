@@ -251,9 +251,11 @@ nano .env
 ```
 
 Verás algo así:
-PIHOLE_PASSWORD=tu_contraseña_segura
-GRAFANA_PASSWORD=tu_contraseña_segura
-WIREGUARD_SERVERURL=tu_ip_local
+
+- PIHOLE_PASSWORD=tu_contraseña_segura
+- GRAFANA_PASSWORD=tu_contraseña_segura
+- WIREGUARD_SERVERURL=tu_ip_local
+
 - Sustituye `tu_contraseña_segura` por una contraseña de tu elección.
 - Sustituye `tu_ip_local` por la IP de tu Raspberry Pi (ej: `192.168.1.100`).
 - Para guardar: pulsa `Ctrl+O`, luego `Enter`, luego `Ctrl+X` para salir.
