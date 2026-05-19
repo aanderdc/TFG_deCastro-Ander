@@ -6,6 +6,8 @@
 
 ## Índice de Contenidos
 
+## Índice de Contenidos
+
 - [1. Descripción del Proyecto](#1-descripción-del-proyecto)
   - [1.1. Alineación con los Objetivos de Desarrollo Sostenible (ODS)](#11-alineación-con-los-objetivos-de-desarrollo-sostenible-ods)
 - [2. Arquitectura del Sistema](#2-arquitectura-del-sistema)
@@ -33,7 +35,12 @@
   - [12.6. Paso 6: Configurar el DNS en el Router Principal](#126-paso-6-configurar-el-dns-en-el-router-principal)
   - [12.7. Paso 7: Acceso al Cuadro de Mandos (SIEM)](#127-paso-7-acceso-al-cuadro-de-mandos-siem)
 - [13. Resolución de Problemas Frecuentes (FAQ)](#13-resolución-de-problemas-frecuentes-faq)
-- [14. Licencia](#14-licencia)
+- [14. Visibilidad de Red: Limitaciones y Ampliaciones](#14-visibilidad-de-red-limitaciones-y-ampliaciones)
+  - [14.1. El problema: tráfico que el sistema no puede ver](#141-el-problema-tráfico-que-el-sistema-no-puede-ver)
+  - [14.2. Soluciones para visibilidad total de red](#142-soluciones-para-visibilidad-total-de-red)
+  - [14.3. Comparativa de opciones](#143-comparativa-de-opciones)
+  - [14.4. Estado actual del proyecto](#144-estado-actual-del-proyecto)
+- [15. Licencia](#15-licencia)
 
 ---
 
@@ -339,7 +346,232 @@ Verifica que el DNS de tu router apunta a la IP correcta de la Raspberry Pi (Pas
 Edita el archivo `.env`, cambia `PIHOLE_PASSWORD` y reinicia con `docker compose restart`.
 
 ---
+## 14. Visibilidad de Red: Limitaciones y Ampliaciones
 
-## 14. Licencia
+### 14.1. El problema: tráfico que el sistema no puede ver
+
+En la arquitectura actual, ntopng y tshark escuchan sobre la interfaz `wlan0` de la Raspberry Pi. Esto significa que el sistema **solo captura el tráfico que pasa directamente por la Raspberry**, no el tráfico que circula entre otros dispositivos de la red.
+INTERNET
+│
+▼
+┌─────────────┐
+│   ROUTER    │
+│ 192.168.1.1 │
+└─────────────┘
+│               │
+│ (LAN eth)     │ (WiFi)
+▼               ▼
+┌─────────────────────────────┐
+│      RASPBERRY PI           │  ← Solo ve su propio tráfico
+│      192.168.1.147          │     y el tráfico WiFi que
+│      ntopng · tshark        │     pasa por wlan0
+└─────────────────────────────┘
+    PC ──────────── Servidor interno
+          ↑
+    Este tráfico lateral
+    NO pasa por la Raspberry
+    → El sistema no lo ve
+
+**Tráfico que NO se captura:**
+
+- **Tráfico lateral (East-West):** comunicaciones entre dispositivos de la misma red (PC ↔ servidor, móvil ↔ impresora).
+- **Escaneo interno:** un dispositivo comprometido escaneando otros equipos de la red en busca de vulnerabilidades.
+- **Movimiento lateral de malware:** propagación de ransomware entre equipos internos.
+- **Transferencias entre dispositivos:** archivos enviados de un equipo a otro sin salir a internet.
+
+**¿Por qué es relevante para una PYME?**
+
+El movimiento lateral es la fase más crítica de un ataque de ransomware. Sin visibilidad sobre este tráfico, el sistema detecta la entrada pero no la propagación:
+Fase 1 — Entrada via DNS malicioso   → ✅ Pi-hole lo bloquea
+Fase 2 — Contacto con servidor C2    → ✅ ntopng detecta el score
+Fase 3 — Movimiento lateral interno  → ❌ No visible
+Fase 4 — Cifrado de archivos         → ❌ Demasiado tarde
+
+El sistema compensa parcialmente esta limitación con el filtrado DNS preventivo (que corta el ataque antes de que llegue a la fase 3) y con las alertas de tráfico anómalo. Aun así, **la visibilidad completa del tráfico lateral requiere una de las soluciones descritas a continuación**.
+
+---
+
+### 14.2. Soluciones para visibilidad total de red
+
+#### Opción 1 — Port Mirroring en el router
+
+Si tu router lo soporta, puedes configurarlo para que clone todo el tráfico y lo envíe a la Raspberry, sin modificar nada de la arquitectura de red.
+INTERNET → ROUTER → Dispositivos
+│
+│ (copia de TODO el tráfico via SPAN port)
+▼
+RASPBERRY PI → ntopng ve todo el tráfico
+
+**Coste:** 0 € (sin hardware adicional)  
+**Dificultad:** Baja  
+**Requisito:** Que el router soporte port mirroring (la mayoría de routers domésticos no lo tienen)
+
+**Cómo comprobarlo:**
+1. Entra a la configuración de tu router: `http://192.168.1.1`
+2. Busca las opciones `Port Mirror`, `SPAN Port` o `Traffic Mirror`
+3. Si aparece, configura el puerto de destino como la IP de la Raspberry Pi
+
+---
+
+#### Opción 2 — Raspberry Pi como gateway (visibilidad total)
+
+Se coloca la Raspberry Pi **entre el router y el resto de la red**. Todo el tráfico pasa físicamente por ella, lo que permite capturarlo completamente.
+INTERNET → ROUTER → RASPBERRY PI → SWITCH → Dispositivos
+eth0    eth1
+(hacia   (hacia
+router)   LAN)
+↑
+Todo el tráfico
+pasa por aquí
+
+**Coste:** ~25 € (adaptador USB-Ethernet + switch básico)  
+**Dificultad:** Media  
+**Visibilidad:** Total — todo el tráfico de la red, incluyendo el lateral
+
+**Hardware necesario:**
+
+- **Adaptador USB-Ethernet** (~10 €): para tener una segunda interfaz de red en la Raspberry Pi. Cualquier adaptador USB 3.0 Gigabit compatible con Linux es válido.
+- **Switch básico** (~15 €): para conectar todos los dispositivos a la segunda interfaz de la Raspberry.
+
+**Configuración paso a paso:**
+
+**1. Identificar las interfaces disponibles:**
+```bash
+ip link show
+# eth0 → conectada al router (WAN)
+# eth1 → adaptador USB-Ethernet (LAN, hacia los dispositivos)
+```
+
+**2. Activar el reenvío de paquetes en el sistema operativo:**
+```bash
+echo 'net.ipv4.ip_forward=1' | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+```
+
+**3. Configurar NAT con iptables:**
+```bash
+# Permite que el tráfico de la LAN salga por la WAN
+sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+
+# Permite el reenvío entre interfaces
+sudo iptables -A FORWARD -i eth1 -o eth0 -j ACCEPT
+sudo iptables -A FORWARD -i eth0 -o eth1 -m state \
+  --state RELATED,ESTABLISHED -j ACCEPT
+
+# Guardar reglas para que persistan tras reinicio
+sudo apt install iptables-persistent -y
+sudo netfilter-persistent save
+```
+
+**4. Configurar ntopng para escuchar en ambas interfaces:**
+
+Modifica el comando de ntopng en `docker-compose.yml`:
+```yaml
+ntopng:
+  command: ntopng -i eth1 -i wlan0 -w 3001 --community --disable-login=1 -r 127.0.0.1
+```
+
+**5. Configurar tshark para capturar en la interfaz LAN:**
+```yaml
+tshark-sflow:
+  command: >
+    bash -c "apt-get update -qq && apt-get install -y -qq tshark &&
+    touch /logs/tshark_capture.txt && chmod 666 /logs/tshark_capture.txt &&
+    tshark -i eth1 -s 1600 -l >> /logs/tshark_capture.txt 2>&1"
+```
+
+**6. Redirigir el DNS de la red al Pi-hole:**
+
+Configura los dispositivos (o el servidor DHCP del router) para que usen `192.168.1.147` como DNS primario. Con la Raspberry como gateway, también puedes forzar esto mediante iptables:
+```bash
+# Redirigir todas las consultas DNS de la LAN al Pi-hole
+sudo iptables -t nat -A PREROUTING -i eth1 -p udp --dport 53 \
+  -j DNAT --to-destination 192.168.1.147:53
+sudo iptables -t nat -A PREROUTING -i eth1 -p tcp --dport 53 \
+  -j DNAT --to-destination 192.168.1.147:53
+```
+
+Esto garantiza que ningún dispositivo pueda evadir el filtrado DNS aunque configure manualmente un DNS externo.
+
+---
+
+#### Opción 3 — Switch gestionable con SPAN port (recomendada)
+
+Se añade un switch gestionable barato entre el router y los dispositivos. Sin modificar la arquitectura existente, el switch clona todo el tráfico y lo envía a la Raspberry a través de un puerto espejo.
+INTERNET → ROUTER → SWITCH GESTIONABLE → Dispositivos
+│
+│ Puerto espejo (SPAN)
+│ Copia de todo el tráfico
+▼
+RASPBERRY PI
+ntopng · tshark
+ven todo el tráfico
+
+**Coste:** ~25-35 €  
+**Dificultad:** Baja — solo configuración web, sin tocar el sistema operativo  
+**Visibilidad:** Total  
+**Ventaja:** No altera la topología de red ni requiere configurar routing en la Raspberry
+
+**Switches compatibles recomendados:**
+
+| Modelo | Precio aprox. | Puertos |
+|--------|--------------|---------|
+| TP-Link TL-SG105E | ~25 € | 5x GbE |
+| Netgear GS305E | ~30 € | 5x GbE |
+| TP-Link TL-SG108E | ~35 € | 8x GbE |
+
+Todos incluyen interfaz web de gestión y soporte para port mirroring.
+
+**Configuración en TP-Link TL-SG105E:**
+
+1. Conecta el switch entre el router y los dispositivos.
+2. Conecta la Raspberry Pi a un puerto libre del switch (por ejemplo el puerto 5).
+3. Accede a la interfaz web del switch: `http://192.168.1.X` (ver IP en el manual).
+4. Ve a **Switching → Port Mirror**.
+5. Configura:
+   - **Mirror Port (destino):** Puerto 5 (donde está la Raspberry)
+   - **Mirrored Ports (origen):** Todos los demás puertos (1, 2, 3, 4)
+   - **Mode:** Ingress + Egress (para capturar tráfico en ambas direcciones)
+6. Guarda la configuración.
+
+A partir de ese momento, ntopng y tshark recibirán una copia de todo el tráfico que circule por el switch.
+
+**Ajuste en ntopng para la nueva interfaz:**
+
+Si la Raspberry recibe el tráfico espejado por `eth0`:
+```yaml
+ntopng:
+  command: ntopng -i eth0 -i wlan0 -w 3001 --community --disable-login=1 -r 127.0.0.1
+```
+
+---
+
+### 14.3. Comparativa de opciones
+
+| Opción | Coste | Dificultad | Visibilidad | Modifica la red |
+|--------|-------|------------|-------------|-----------------|
+| Port Mirror en router | 0 € | Baja | Total | No |
+| Raspberry como gateway | ~25 € | Media | Total | Sí |
+| Switch gestionable (SPAN) | ~30 € | Baja | Total | No |
+| **Arquitectura actual** | **0 €** | **—** | **Parcial** | **No** |
+
+---
+
+### 14.4. Estado actual del proyecto
+
+La arquitectura actual captura el tráfico de subida que atraviesa `wlan0` y el tráfico generado por la propia Raspberry Pi. Esto cubre los escenarios más habituales de amenaza en redes domésticas y PYME pequeñas:
+
+- ✅ Filtrado DNS preventivo de más de 600.000 dominios maliciosos
+- ✅ Detección de comunicaciones con servidores C2 conocidos
+- ✅ Identificación de dispositivos por MAC y fabricante
+- ✅ Motor de alertas con clasificación de severidad
+- ✅ Captura de paquetes HTTP/DNS en tiempo real
+- ❌ Tráfico lateral entre dispositivos de la misma red
+
+La implementación de cualquiera de las opciones descritas eliminaría esta limitación y convertiría el sistema en una solución de visibilidad total de red.
+
+---
+
+## 15. Licencia
 
 Proyecto académico desarrollado como Trabajo de Fin de Grado.
