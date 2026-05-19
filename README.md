@@ -351,28 +351,36 @@ Edita el archivo `.env`, cambia `PIHOLE_PASSWORD` y reinicia con `docker compose
 ### 14.1. El problema: tráfico que el sistema no puede ver
 
 En la arquitectura actual, ntopng y tshark escuchan sobre la interfaz `wlan0` de la Raspberry Pi. Esto significa que el sistema **solo captura el tráfico que pasa directamente por la Raspberry**, no el tráfico que circula entre otros dispositivos de la red.
+```bash
 INTERNET
-│
-▼
-┌─────────────┐
-│   ROUTER    │
-│ 192.168.1.1 │
-└─────────────┘
-│               │
-│ (LAN eth)     │ (WiFi)
-▼               ▼
-┌─────────────────────────────┐
-│      RASPBERRY PI           │  ← Solo ve su propio tráfico
-│      192.168.1.147          │     y el tráfico WiFi que
-│      ntopng · tshark        │     pasa por wlan0
-└─────────────────────────────┘
-    PC ──────────── Servidor interno
-          ↑
-    Este tráfico lateral
-    NO pasa por la Raspberry
-    → El sistema no lo ve
+    │
+    ▼
+┌─────────────────┐
+│     ROUTER      │
+│   192.168.1.1   │
+└────────┬────────┘
+         │
+    ┌────┴────┐
+    │         │
+ LAN eth     WiFi
+    │         │
+    └────┬────┘
+         ▼
+┌─────────────────────────┐
+│      RASPBERRY PI       │
+│     192.168.1.147       │
+│    ntopng · tshark      │
+│  (solo ve su tráfico    │
+│   y el WiFi de wlan0)   │
+└─────────────────────────┘
 
-**Tráfico que NO se captura:**
+┌──────────┐   ✗ NO visible   ┌──────────────────┐
+│    PC    │ - - - - - - - -  │ Servidor interno  │
+└──────────┘                  └──────────────────┘
+               ↑
+    Este tráfico lateral no pasa
+    por la Raspberry → no se captura
+```
 
 - **Tráfico lateral (East-West):** comunicaciones entre dispositivos de la misma red (PC ↔ servidor, móvil ↔ impresora).
 - **Escaneo interno:** un dispositivo comprometido escaneando otros equipos de la red en busca de vulnerabilidades.
