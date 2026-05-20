@@ -14,19 +14,20 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "")
 from datetime import timedelta
 app.permanent_session_lifetime = timedelta(hours=24)
 
-# --- CONFIGURACIÓN ---
+# --- CONFIGURACIÓN (desde variables de entorno) ---
+RASPBERRY_IP    = os.environ.get('RASPBERRY_IP', '127.0.0.1')
 PIHOLE_BASE_URL = f"http://{os.environ.get("RASPBERRY_IP","127.0.0.1")}/api"
 PASSWORD_PIHOLE = os.environ.get("PIHOLE_PASSWORD", "")
 
 NTOPNG_BASE = "http://127.0.0.1:3001"
-NTOPNG_USER = "admin"
+NTOPNG_USER = os.environ.get('NTOPNG_USER', 'admin')
 NTOPNG_PASS = os.environ.get("NTOPNG_PASSWORD", "")
 
 ntopng_session = requests.Session()
 ntopng_authenticated = False
 
 DB_PATH = 'data/historial_red.db'
-ADMIN_USER = "admin"
+ADMIN_USER = os.environ.get('DASHBOARD_USER', 'admin')
 ADMIN_PASS = os.environ.get("DASHBOARD_PASSWORD", "")
 
 TSHARK_LOG_PATH = '/tshark_logs/tshark_capture.txt'
@@ -56,6 +57,15 @@ def init_db():
                       (mac TEXT PRIMARY KEY,
                        fabricante TEXT,
                        fecha TEXT)''')
+    # Tabla para conexiones laterales detectadas por tshark
+    cursor.execute('''CREATE TABLE IF NOT EXISTS lateral_connections
+                      (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                       fecha TEXT,
+                       src_ip TEXT,
+                       dst_ip TEXT,
+                       protocolo TEXT,
+                       puerto_dst TEXT,
+                       info TEXT)''')
     conn.commit()
     conn.close()
 
@@ -304,6 +314,105 @@ def get_ntopng_hosts():
         ntopng_authenticated = False
         return None
 
+# --- DETECCIÓN DE TRÁFICO LATERAL ---
+# Rastrea la última línea procesada para no reprocesar todo el log cada ciclo
+_tshark_last_line = 0
+
+def analizar_trafico_lateral(cursor):
+    """
+    Parsea las líneas nuevas de tshark buscando pares src→dst donde AMBAS IPs
+    son internas (192.168.x.x). Eso es tráfico lateral que el sistema no captura
+    vía ntopng pero sí puede ver si alguno de los dispositivos se comunica con
+    la propia Raspberry (o si en el futuro se añade port mirroring).
+
+    También detecta patrones de escaneo: un mismo src contactando muchos dst
+    distintos en el mismo ciclo de 30s → alerta LATERAL_SCAN.
+    """
+    global _tshark_last_line
+    try:
+        with open(TSHARK_LOG_PATH, 'r', errors='replace') as f:
+            todas = f.readlines()
+    except FileNotFoundError:
+        return
+
+    nuevas = todas[_tshark_last_line:]
+    _tshark_last_line = len(todas)
+
+    if not nuevas:
+        return
+
+    ahora = get_ahora_madrid()
+    # src_ip -> conjunto de dst_ip distintas contactadas en este ciclo
+    contactos_por_src = {}
+
+    for line in nuevas:
+        p = parse_tshark_line(line)
+        if not p:
+            continue
+        src = p.get('src', '')
+        dst = p.get('dst', '')
+
+        # Solo nos interesan pares donde AMBOS son IPs internas 192.168.x.x
+        if not (src.startswith('192.168.') and dst.startswith('192.168.')):
+            continue
+        # Ignorar la propia Raspberry como origen (su tráfico ya lo vemos)
+        # pero SÍ la queremos como destino para detectar escaneos hacia ella
+        proto = p.get('protocolo', '')
+        info  = p.get('info', '')
+
+        # Extraer puerto destino de la info si es TCP/UDP
+        puerto_dst = ''
+        if '→' in info:
+            partes = info.split('→')
+            if len(partes) > 1:
+                puerto_dst = partes[1].strip().split()[0] if partes[1].strip() else ''
+
+        # Guardar en BD (deduplicar: misma pareja en el mismo minuto)
+        existe = cursor.execute('''
+            SELECT id FROM lateral_connections
+            WHERE src_ip=? AND dst_ip=? AND protocolo=?
+              AND fecha >= datetime(?, '-1 minute')
+        ''', (src, dst, proto, ahora)).fetchone()
+
+        if not existe:
+            cursor.execute('''INSERT INTO lateral_connections
+                              (fecha, src_ip, dst_ip, protocolo, puerto_dst, info)
+                              VALUES (?, ?, ?, ?, ?, ?)''',
+                           (ahora, src, dst, proto, puerto_dst, info[:120]))
+
+        # Acumular contactos por src para detectar escaneo
+        if src not in contactos_por_src:
+            contactos_por_src[src] = set()
+        contactos_por_src[src].add(dst)
+
+    # Regla 5: Escaneo lateral — un dispositivo interno contacta >5 IPs internas distintas en 30s
+    for src_ip, dsts in contactos_por_src.items():
+        if len(dsts) >= 5:
+            severidad = 'CRITICA' if len(dsts) >= 15 else 'ALTA'
+            registrar_alerta(cursor, 'LATERAL_SCAN', src_ip,
+                f'Posible escaneo interno: {src_ip} contactó {len(dsts)} IPs internas distintas en 30s',
+                severidad)
+
+    # Regla 6: Conexión lateral a puertos sensibles (RDP 3389, SMB 445, SSH 22)
+    puertos_criticos = {'3389': 'RDP', '445': 'SMB', '22': 'SSH', '23': 'Telnet', '5900': 'VNC'}
+    for src_ip, dsts in contactos_por_src.items():
+        # Buscar en las nuevas líneas de este ciclo conexiones a esos puertos
+        pass  # Ya se registra en lateral_connections; la alerta se genera en el insert
+
+    # Alerta puntual por puerto crítico detectado en este ciclo
+    rows_criticos = cursor.execute('''
+        SELECT src_ip, dst_ip, puerto_dst FROM lateral_connections
+        WHERE fecha >= datetime(?, '-1 minute')
+          AND puerto_dst IN ('3389', '445', '22', '23', '5900')
+    ''', (ahora,)).fetchall()
+
+    for src_ip, dst_ip, puerto in rows_criticos:
+        nombre_proto = puertos_criticos.get(puerto, puerto)
+        registrar_alerta(cursor, 'LATERAL_PORT', src_ip,
+            f'Conexión lateral a puerto crítico {nombre_proto} ({puerto}): {src_ip} → {dst_ip}',
+            'CRITICA')
+
+
 # --- LOGGER DE FONDO ---
 def background_logger():
     ntopng_login()
@@ -329,6 +438,11 @@ def background_logger():
                 print(f"[{ahora}] ntopng OK — {len(hosts)} dispositivos guardados")
             else:
                 print(f"[{ahora}] ntopng sin datos de hosts")
+
+            # 3. Análisis de tráfico lateral (tshark) — siempre, independiente de ntopng
+            analizar_trafico_lateral(cursor)
+            conn.commit()
+
 
             # 2. Captura Pi-hole DNS
             sid = get_sid()
@@ -375,7 +489,7 @@ def index():
     cursor.execute("SELECT dispositivo, ip, bytes_bajada, protocolo_l7, fecha_hora FROM trafico_dispositivos ORDER BY id DESC LIMIT 15")
     flujos = cursor.fetchall()
     conn.close()
-    return render_template('index.html', flujos=flujos)
+    return render_template('index.html', flujos=flujos, raspberry_ip=RASPBERRY_IP)
 
 @app.route('/api/data')
 @login_required
@@ -535,6 +649,69 @@ def api_hosts():
     if hosts is None:
         return jsonify({"ok": False, "error": "No se pudo conectar con ntopng"}), 500
     return jsonify({"ok": True, "hosts": hosts, "total": len(hosts)})
+
+
+# --- RUTAS TRÁFICO LATERAL ---
+
+@app.route('/lateral')
+@login_required
+def lateral():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    # Últimas 200 conexiones laterales
+    rows = cursor.execute('''
+        SELECT id, fecha, src_ip, dst_ip, protocolo, puerto_dst, info
+        FROM lateral_connections ORDER BY id DESC LIMIT 200
+    ''').fetchall()
+    total = cursor.execute('SELECT COUNT(*) FROM lateral_connections').fetchone()[0]
+    # IPs únicas que han generado tráfico lateral
+    srcs_unicos = cursor.execute('''
+        SELECT src_ip, COUNT(DISTINCT dst_ip) as destinos, COUNT(*) as conexiones
+        FROM lateral_connections
+        WHERE fecha >= datetime('now', '-24 hours', 'localtime')
+        GROUP BY src_ip ORDER BY destinos DESC LIMIT 10
+    ''').fetchall()
+    conn.close()
+    return render_template('lateral.html', conexiones=rows, total=total, srcs=srcs_unicos)
+
+@app.route('/api/lateral')
+@login_required
+def api_lateral():
+    horas = int(request.args.get('horas', 1))
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    rows = cursor.execute('''
+        SELECT fecha, src_ip, dst_ip, protocolo, puerto_dst, info
+        FROM lateral_connections
+        WHERE fecha >= datetime('now', ?, 'localtime')
+        ORDER BY id DESC LIMIT 500
+    ''', (f'-{horas} hours',)).fetchall()
+    # Mapa src → lista de dst (para visualizar el grafo)
+    grafo = {}
+    for r in rows:
+        src = r[1]
+        dst = r[2]
+        if src not in grafo:
+            grafo[src] = []
+        if dst not in grafo[src]:
+            grafo[src].append(dst)
+    conn.close()
+    return jsonify({
+        "ok": True,
+        "total": len(rows),
+        "conexiones": [{"fecha": r[0], "src": r[1], "dst": r[2],
+                        "proto": r[3], "puerto": r[4], "info": r[5]} for r in rows],
+        "grafo": grafo
+    })
+
+@app.route('/api/lateral/clear', methods=['POST'])
+@login_required
+def api_lateral_clear():
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute('DELETE FROM lateral_connections')
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
 
 
 # --- RUTAS CONTROL TSHARK ---

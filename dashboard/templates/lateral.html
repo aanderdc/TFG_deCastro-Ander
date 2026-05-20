@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Red Interna — S.I.E.M.</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root { --primary-dark: #0f172a; --bg-light: #f8fafc; }
+    body { background-color: var(--bg-light); color: #334155; font-family: 'Segoe UI', sans-serif; }
+    .header-bar {
+      background-color: var(--primary-dark);
+      color: white;
+      padding: 1.2rem 0;
+      border-bottom: 3px solid #334155;
+      margin-bottom: 2rem;
+      position: relative;
+    }
+    .nav-btn {
+      background-color: white;
+      color: var(--primary-dark);
+      text-decoration: none;
+      padding: 0.8rem;
+      border-radius: 8px;
+      display: inline-block;
+      text-align: center;
+      font-weight: 600;
+      border: 2px solid #e2e8f0;
+      transition: all 0.2s;
+      font-size: 0.85rem;
+    }
+    .nav-btn:hover { background-color: var(--primary-dark); color: white; }
+    .nav-btn.active { background: var(--primary-dark); color: white; }
+    .stat-card {
+      background: white;
+      border-radius: 10px;
+      padding: 1.2rem 1.5rem;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .label { color: #64748b; text-transform: uppercase; font-size: 0.7rem; font-weight: 800; }
+    .value { font-size: 1.8rem; font-weight: 700; color: #1e293b; }
+    .table-container {
+      background: white;
+      border-radius: 10px;
+      padding: 1.5rem;
+      border: 1px solid #e2e8f0;
+      margin-top: 1.5rem;
+    }
+    .live-dot {
+      display: inline-block; width: 8px; height: 8px;
+      border-radius: 50%; background: #22c55e; margin-right: 6px;
+      animation: blink 1.2s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+    /* Puertos críticos */
+    .puerto-critico { color: #dc2626; font-weight: 700; }
+    .puerto-normal  { color: #64748b; }
+
+    /* Grafo SVG */
+    #grafo-svg { width: 100%; height: 340px; }
+    .node circle { stroke: #0f172a; stroke-width: 2; }
+    .node text { font-size: 11px; fill: #1e293b; font-family: 'Segoe UI', sans-serif; }
+    .link { stroke: #94a3b8; stroke-width: 1.5; stroke-opacity: 0.7; }
+    .link.critico { stroke: #dc2626; stroke-width: 2.5; stroke-opacity: 1; }
+
+    .badge-scan { background: #dc2626; color: white; font-size: 0.65rem; padding: 2px 7px; border-radius: 4px; }
+    .badge-port { background: #ea580c; color: white; font-size: 0.65rem; padding: 2px 7px; border-radius: 4px; }
+    .badge-ok   { background: #e2e8f0; color: #475569; font-size: 0.65rem; padding: 2px 7px; border-radius: 4px; }
+
+    .alert-banner {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      padding: 0.8rem 1.2rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+    .alert-banner.visible { display: block; }
+  </style>
+</head>
+<body>
+
+<div class="header-bar text-center">
+  <div class="container">
+    <h3 class="mb-1 fw-bold">RED INTERNA</h3>
+    <p class="mb-0 text-uppercase" style="font-size:0.8rem;color:#94a3b8;letter-spacing:2px;">TFG — Ander de Castro</p>
+  </div>
+  <a href="/logout" style="position:absolute;top:50%;right:24px;transform:translateY(-50%);
+      color:#94a3b8;font-size:0.75rem;font-weight:600;text-decoration:none;
+      border:1px solid #334155;padding:6px 14px;border-radius:6px;
+      text-transform:uppercase;letter-spacing:1px;"
+      onmouseover="this.style.color='#fff';this.style.borderColor='#ef4444'"
+      onmouseout="this.style.color='#94a3b8';this.style.borderColor='#334155'">
+      Salir →
+  </a>
+</div>
+
+<div class="container">
+
+  <!-- NAV -->
+  <div class="d-flex gap-2 mb-4 flex-wrap">
+    <a href="/" class="nav-btn">Dashboard</a>
+    <a href="/sniffer" class="nav-btn">Sniffer</a>
+    <a href="/graficas" class="nav-btn">Gráficas</a>
+    <a href="/alertas" class="nav-btn">Alertas</a>
+    <a href="/lateral" class="nav-btn active">Red Interna</a>
+  </div>
+
+  <!-- BANNER si hay escaneos detectados -->
+  <div class="alert-banner" id="scan-banner">
+    <strong>⚠ Posible movimiento lateral detectado.</strong>
+    Un dispositivo ha contactado múltiples IPs internas. Revisa las alertas.
+  </div>
+
+  <!-- STATS -->
+  <div class="row g-3 mb-2">
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="label">Total Conexiones</div>
+        <div class="value" id="stat-total">{{ total }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="label">Última hora</div>
+        <div class="value" id="stat-ultima-hora">—</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="label">Puertos críticos</div>
+        <div class="value text-danger" id="stat-criticos">—</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="label">IPs origen</div>
+        <div class="value" id="stat-srcs">{{ srcs|length }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mt-1">
+
+    <!-- MAPA DE CONEXIONES (grafo SVG simple) -->
+    <div class="col-12 col-md-6">
+      <div class="table-container" style="height:380px;">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="fw-bold small text-uppercase" style="font-size:0.75rem;letter-spacing:1px;">
+            Mapa de conexiones internas (última hora)
+          </span>
+          <select id="horas-select" class="form-select form-select-sm w-auto" onchange="refreshGrafo()">
+            <option value="1">Última hora</option>
+            <option value="6">6 horas</option>
+            <option value="24">24 horas</option>
+          </select>
+        </div>
+        <svg id="grafo-svg">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                    markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+            </marker>
+            <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5"
+                    markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc2626"/>
+            </marker>
+          </defs>
+          <g id="grafo-g"></g>
+        </svg>
+        <p class="text-muted small mb-0" style="font-size:0.7rem;">
+          🔴 Conexión a puerto crítico (RDP/SMB/SSH) &nbsp;|&nbsp; ⚫ Conexión normal
+        </p>
+      </div>
+    </div>
+
+    <!-- TOP ORÍGENES -->
+    <div class="col-12 col-md-6">
+      <div class="table-container" style="height:380px; overflow-y:auto;">
+        <div class="fw-bold small text-uppercase mb-3" style="font-size:0.75rem;letter-spacing:1px;">
+          Top orígenes (24h)
+        </div>
+        <table class="table table-sm align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>IP Origen</th>
+              <th>Destinos únicos</th>
+              <th>Conexiones</th>
+              <th>Riesgo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in srcs %}
+            <tr>
+              <td class="fw-bold small">{{ s[0] }}</td>
+              <td>{{ s[1] }}</td>
+              <td>{{ s[2] }}</td>
+              <td>
+                {% if s[1] >= 15 %}
+                  <span class="badge-scan">ESCANEO</span>
+                {% elif s[1] >= 5 %}
+                  <span class="badge-port">SOSPECHOSO</span>
+                {% else %}
+                  <span class="badge-ok">NORMAL</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="4" class="text-muted text-center py-3">
+                Sin datos aún. El análisis se actualiza cada 30s.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLA DE CONEXIONES -->
+  <div class="table-container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <span class="live-dot"></span>
+        <span class="fw-bold small text-uppercase" style="font-size:0.75rem;letter-spacing:1px;">
+          Registro de Conexiones Internas
+        </span>
+        <span class="text-muted small ms-2" id="last-refresh">—</span>
+      </div>
+      <button onclick="limpiarLateral()" class="btn btn-sm btn-outline-danger">Limpiar</button>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>Fecha</th>
+            <th>Origen</th>
+            <th>Destino</th>
+            <th>Protocolo</th>
+            <th>Puerto dst</th>
+            <th>Info</th>
+          </tr>
+        </thead>
+        <tbody id="lateral-tbody">
+          {% for c in conexiones %}
+          <tr>
+            <td class="text-muted small">{{ c[0] }}</td>
+            <td class="small">{{ c[1] }}</td>
+            <td class="fw-bold small">{{ c[2] }}</td>
+            <td class="small">{{ c[3] }}</td>
+            <td class="small">{{ c[4] }}</td>
+            <td class="small {% if c[5] in ['3389','445','22','23','5900'] %}puerto-critico{% else %}puerto-normal{% endif %}">
+              {{ c[5] or '—' }}
+              {% if c[5] == '3389' %}<span class="ms-1 text-muted" style="font-size:0.65rem;">RDP</span>
+              {% elif c[5] == '445' %}<span class="ms-1 text-muted" style="font-size:0.65rem;">SMB</span>
+              {% elif c[5] == '22' %}<span class="ms-1 text-muted" style="font-size:0.65rem;">SSH</span>
+              {% elif c[5] == '5900' %}<span class="ms-1 text-muted" style="font-size:0.65rem;">VNC</span>
+              {% endif %}
+            </td>
+            <td class="small text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ c[6] }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-4">
+              Sin conexiones internas detectadas todavía.<br>
+              <small>Se detectan cuando dos IPs 192.168.x.x se comunican entre sí a través de la Raspberry.</small>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+  const PUERTOS_CRITICOS = new Set(['3389','445','22','23','5900']);
+  const NOMBRES_PUERTO = {'3389':'RDP','445':'SMB','22':'SSH','23':'Telnet','5900':'VNC'};
+
+  // ---- GRAFO SVG ----
+  function dibujarGrafo(grafo) {
+    const svg = document.getElementById('grafo-svg');
+    const g   = document.getElementById('grafo-g');
+    g.innerHTML = '';
+
+    const nodos = new Set();
+    const enlaces = [];
+    for (const [src, dsts] of Object.entries(grafo)) {
+      nodos.add(src);
+      for (const dst of dsts) {
+        nodos.add(dst);
+        enlaces.push({src, dst});
+      }
+    }
+
+    const nodosArr = [...nodos];
+    const W = svg.clientWidth  || 500;
+    const H = svg.clientHeight || 320;
+    const cx = W / 2, cy = H / 2;
+    const radio = Math.min(W, H) * 0.35;
+
+    // Posiciones en círculo
+    const pos = {};
+    nodosArr.forEach((n, i) => {
+      const angle = (2 * Math.PI * i) / nodosArr.length - Math.PI / 2;
+      pos[n] = {
+        x: cx + radio * Math.cos(angle),
+        y: cy + radio * Math.sin(angle)
+      };
+    });
+
+    // Dibujar enlaces
+    enlaces.forEach(({src, dst}) => {
+      if (!pos[src] || !pos[dst]) return;
+      const esCritico = enlaces.filter(e => e.src === src)
+                               .some(e => PUERTOS_CRITICOS.has(e.dst));
+      const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1', pos[src].x);
+      line.setAttribute('y1', pos[src].y);
+      line.setAttribute('x2', pos[dst].x);
+      line.setAttribute('y2', pos[dst].y);
+      line.setAttribute('class', 'link' + (esCritico ? ' critico' : ''));
+      line.setAttribute('marker-end', esCritico ? 'url(#arrow-red)' : 'url(#arrow)');
+      g.appendChild(line);
+    });
+
+    // Dibujar nodos
+    nodosArr.forEach(n => {
+      if (!pos[n]) return;
+      const esSrc = Object.keys(grafo).includes(n);
+      const grupo = document.createElementNS('http://www.w3.org/2000/svg','g');
+      grupo.setAttribute('class','node');
+
+      const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      circle.setAttribute('cx', pos[n].x);
+      circle.setAttribute('cy', pos[n].y);
+      circle.setAttribute('r', esSrc ? 10 : 7);
+      circle.setAttribute('fill', esSrc ? '#0f172a' : '#cbd5e1');
+      grupo.appendChild(circle);
+
+      const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+      label.setAttribute('x', pos[n].x);
+      label.setAttribute('y', pos[n].y + 20);
+      label.setAttribute('text-anchor','middle');
+      label.textContent = n.replace('192.168.', '…');
+      grupo.appendChild(label);
+
+      g.appendChild(grupo);
+    });
+
+    if (nodosArr.length === 0) {
+      const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.setAttribute('x', W/2); txt.setAttribute('y', H/2);
+      txt.setAttribute('text-anchor','middle');
+      txt.setAttribute('fill','#94a3b8'); txt.setAttribute('font-size','13');
+      txt.textContent = 'Sin conexiones internas en el período seleccionado';
+      g.appendChild(txt);
+    }
+  }
+
+  async function refreshGrafo() {
+    const horas = document.getElementById('horas-select').value;
+    try {
+      const r = await fetch(`/api/lateral?horas=${horas}`);
+      const d = await r.json();
+      if (!d.ok) return;
+
+      document.getElementById('stat-ultima-hora').textContent = d.total;
+
+      // Contar puertos críticos
+      const criticos = d.conexiones.filter(c => PUERTOS_CRITICOS.has(c.puerto)).length;
+      document.getElementById('stat-criticos').textContent = criticos;
+
+      // Banner de aviso si hay sospechosos
+      const hayEscaneo = Object.values(d.grafo).some(dsts => dsts.length >= 5);
+      document.getElementById('scan-banner').classList.toggle('visible', hayEscaneo);
+
+      dibujarGrafo(d.grafo);
+
+      // Actualizar tabla
+      const tbody = document.getElementById('lateral-tbody');
+      if (d.conexiones.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">
+          Sin conexiones internas detectadas todavía.</td></tr>`;
+      } else {
+        tbody.innerHTML = d.conexiones.map((c, i) => {
+          const esCritico = PUERTOS_CRITICOS.has(c.puerto);
+          const nombrePuerto = NOMBRES_PUERTO[c.puerto] || '';
+          return `<tr>
+            <td class="text-muted small">${i+1}</td>
+            <td class="small">${c.fecha}</td>
+            <td class="fw-bold small">${c.src}</td>
+            <td class="small">${c.dst}</td>
+            <td class="small">${c.proto}</td>
+            <td class="small ${esCritico ? 'puerto-critico' : 'puerto-normal'}">
+              ${c.puerto || '—'}
+              ${nombrePuerto ? `<span class="ms-1 text-muted" style="font-size:0.65rem;">${nombrePuerto}</span>` : ''}
+            </td>
+            <td class="small text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                title="${c.info}">${c.info}</td>
+          </tr>`;
+        }).join('');
+      }
+
+      document.getElementById('last-refresh').textContent =
+        'Actualizado: ' + new Date().toLocaleTimeString('es-ES');
+    } catch(e) { console.error('[lateral]', e); }
+  }
+
+  async function limpiarLateral() {
+    if (!confirm('¿Borrar todas las conexiones internas registradas?')) return;
+    await fetch('/api/lateral/clear', {method:'POST'});
+    refreshGrafo();
+  }
+
+  refreshGrafo();
+  setInterval(refreshGrafo, 30000);
+</script>
+
+</body>
+</html>

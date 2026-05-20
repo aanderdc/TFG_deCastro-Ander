@@ -261,12 +261,13 @@
     <!-- ACCESOS DIRECTOS -->
     <h5 class="text-center mt-5 mb-3 text-muted fw-bold text-uppercase" style="font-size: 0.9rem;">Accesos Directos</h5>
     <div class="row g-3 justify-content-center">
-        <div class="col-md-2"><a href="http://192.168.1.147/admin" target="_blank" class="nav-btn">PI-HOLE</a></div>
-        <div class="col-md-2"><a href="http://192.168.1.147:3000" target="_blank" class="nav-btn">GRAFANA</a></div>
-        <div class="col-md-2"><a href="http://192.168.1.147:3001" target="_blank" class="nav-btn">NTOPNG</a></div>
-        <div class="col-md-2"><a href="http://192.168.1.147:9090" target="_blank" class="nav-btn">PROMETHEUS</a></div>
+        <div class="col-md-2"><a href="http://{{ raspberry_ip }}/admin" target="_blank" class="nav-btn">PI-HOLE</a></div>
+        <div class="col-md-2"><a href="http://{{ raspberry_ip }}:3000" target="_blank" class="nav-btn">GRAFANA</a></div>
+        <div class="col-md-2"><a href="http://{{ raspberry_ip }}:3001" target="_blank" class="nav-btn">NTOPNG</a></div>
+        <div class="col-md-2"><a href="http://{{ raspberry_ip }}:9090" target="_blank" class="nav-btn">PROMETHEUS</a></div>
         <div class="col-md-2"><a href="/sniffer" class="nav-btn">SNIFFER</a></div>
         <div class="col-md-2"><a href="/graficas" class="nav-btn">GRÁFICAS</a></div>
+        <div class="col-md-2"><a href="/lateral" class="nav-btn">RED INTERNA</a></div>
         <div class="col-md-2" style="position:relative;">
           <a href="/alertas" class="nav-btn" style="border-color:#fca5a5;">ALERTAS</a>
           <span id="alertas-badge" style="display:none;position:absolute;top:-6px;right:-6px;
