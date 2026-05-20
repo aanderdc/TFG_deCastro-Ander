@@ -333,7 +333,7 @@
       "alphabetical-reversed": "Name [Z–A]",
       "alphabetical-reversed-description": "Umgekehrte alphabetische Reihenfolge",
       "outliers": "Ausreißer-Reihe",
-      "outliers-description": "Priorisiert Werte, die ein ***REMOVED***es Verhalten als ***REMOVED***e innerhalb desselben Labels aufweisen"
+      "outliers-description": "Priorisiert Werte, die ein anderes Verhalten als andere innerhalb desselben Labels aufweisen"
     },
     "placeholder": "Kriterien auswählen",
     "tooltip": "Sortiert Werte mithilfe von standardmäßigen oder intelligenten Zeitreihenberechnungen"

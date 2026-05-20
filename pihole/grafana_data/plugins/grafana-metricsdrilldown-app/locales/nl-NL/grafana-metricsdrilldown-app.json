@@ -333,7 +333,7 @@
       "alphabetical-reversed": "Naam [Z-A]",
       "alphabetical-reversed-description": "Omgekeerde alfabetische volgorde",
       "outliers": "Uitschietende reeksen",
-      "outliers-description": "Geeft prioriteit aan waarden die duidelijk verschillend gedrag vertonen van ***REMOVED***en binnen hetzelfde label"
+      "outliers-description": "Geeft prioriteit aan waarden die duidelijk verschillend gedrag vertonen van anderen binnen hetzelfde label"
     },
     "placeholder": "Criteria kiezen",
     "tooltip": "Sorteert waarden met behulp van standaard of slimme tijdreeksberekeningen."

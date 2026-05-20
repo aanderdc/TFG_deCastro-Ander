@@ -91,7 +91,7 @@ services:
       - NET_ADMIN
       - NET_RAW
     volumes:
-      - /home/***REMOVED***/tfg_red/pihole/tshark_logs:/logs
+      - /home/ander/tfg_red/pihole/tshark_logs:/logs
     command: >
       bash -c "apt-get update -qq && apt-get install -y -qq tshark &&
       touch /logs/tshark_capture.txt && chmod 666 /logs/tshark_capture.txt &&
@@ -112,8 +112,8 @@ services:
     network_mode: "host"
     restart: unless-stopped
     volumes:
-      - /home/***REMOVED***/tfg_red/dashboard:/app
-      - /home/***REMOVED***/tfg_red/pihole/tshark_logs:/tshark_logs
+      - /home/ander/tfg_red/dashboard:/app
+      - /home/ander/tfg_red/pihole/tshark_logs:/tshark_logs
       - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /app
     command: >
@@ -140,7 +140,7 @@ services:
     ports:
       - 51820:51820/udp
     volumes:
-      - /home/***REMOVED***/tfg_red/wireguard_config:/config
+      - /home/ander/tfg_red/wireguard_config:/config
       - /lib/modules:/lib/modules
     restart: unless-stopped
 

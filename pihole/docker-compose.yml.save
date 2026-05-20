@@ -10,7 +10,7 @@ services:
       -"80:80/tcp"
     enviroment:
       TZ: 'Europe/Madrid'
-      WEBPASSWORD: '***REMOVED***'
+      WEBPASSWORD: 'ander'
     volumes:
       -'./etc-pihole:/etc/pihole'
       -'./etc-dnsmasq.d:/etc/dnsmasq.d'

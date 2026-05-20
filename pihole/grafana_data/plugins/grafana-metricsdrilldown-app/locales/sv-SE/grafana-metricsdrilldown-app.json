@@ -35,7 +35,7 @@
   "checkbox-list": {
     "clear": "radera",
     "collapse": "Dölj",
-    "expand": "Exp***REMOVED***a",
+    "expand": "Expandera",
     "no-results": "Inga resultat.",
     "selected-count_one": "{{count}} vald",
     "selected-count_other": "{{count}} valda"

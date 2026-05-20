@@ -104,7 +104,7 @@ sudo usermod -aG docker $USER
 ### 5.1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/a***REMOVED***dc/TFG_deCastro-Ander.git
+git clone https://github.com/aanderdc/TFG_deCastro-Ander.git
 cd TFG_deCastro-Ander
 ```
 
@@ -272,7 +272,7 @@ Cierra la terminal y vuelve a conectarte para que los cambios surtan efecto.
 ### 12.4. Paso 4: Descarga del Repositorio y Configuración del Entorno
 
 ```bash
-git clone https://github.com/a***REMOVED***dc/TFG_deCastro-Ander.git
+git clone https://github.com/aanderdc/TFG_deCastro-Ander.git
 cd TFG_deCastro-Ander/pihole
 cp .env.example .env
 ```

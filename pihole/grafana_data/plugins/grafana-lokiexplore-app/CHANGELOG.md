@@ -818,7 +818,7 @@ View [releases](https://github.com/grafana/explore-logs/releases/) on GitHub for
 - README: Fix missing image, empty section by @gtk-grafana in https://github.com/grafana/explore-logs/pull/1089
 - No loki datasource: Splash page by @gtk-grafana in https://github.com/grafana/explore-logs/pull/1061
 - Fix splash page relative URL, update img in readme by @gtk-grafana in https://github.com/grafana/explore-logs/pull/1090
-- Docs: Fix title copy by @knyl***REMOVED***-grafana in https://github.com/grafana/explore-logs/pull/1092
+- Docs: Fix title copy by @knylander-grafana in https://github.com/grafana/explore-logs/pull/1092
 
 ## 1.0.7
 

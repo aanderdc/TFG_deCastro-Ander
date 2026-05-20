@@ -235,8 +235,8 @@
     "unavailable-title": ""
   },
   "quick-search": {
-    "ask-assistant-aria-label": "Dem***REMOVED*** à Grafana Assistant",
-    "ask-assistant-tooltip": "Dem***REMOVED*** à Grafana Assistant",
+    "ask-assistant-aria-label": "Demander à Grafana Assistant",
+    "ask-assistant-tooltip": "Demander à Grafana Assistant",
     "clear-search-tooltip": "Effacer la recherche",
     "placeholder": "",
     "placeholder-question-mode": "Posez une question à Grafana Assistant et appuyez sur Entrée",
