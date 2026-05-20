@@ -390,9 +390,13 @@ INTERNET
 **¿Por qué es relevante para una PYME?**
 
 El movimiento lateral es la fase más crítica de un ataque de ransomware. Sin visibilidad sobre este tráfico, el sistema detecta la entrada pero no la propagación:
+
 Fase 1 — Entrada via DNS malicioso   → ✅ Pi-hole lo bloquea
+
 Fase 2 — Contacto con servidor C2    → ✅ ntopng detecta el score
+
 Fase 3 — Movimiento lateral interno  → ❌ No visible
+
 Fase 4 — Cifrado de archivos         → ❌ Demasiado tarde
 
 El sistema compensa parcialmente esta limitación con el filtrado DNS preventivo (que corta el ataque antes de que llegue a la fase 3) y con las alertas de tráfico anómalo. Aun así, **la visibilidad completa del tráfico lateral requiere una de las soluciones descritas a continuación**.
@@ -424,6 +428,7 @@ RASPBERRY PI → ntopng ve todo el tráfico
 #### Opción 2 — Raspberry Pi como gateway (visibilidad total)
 
 Se coloca la Raspberry Pi **entre el router y el resto de la red**. Todo el tráfico pasa físicamente por ella, lo que permite capturarlo completamente.
+```bash
 INTERNET → ROUTER → RASPBERRY PI → SWITCH → Dispositivos
 eth0    eth1
 (hacia   (hacia
@@ -431,7 +436,7 @@ router)   LAN)
 ↑
 Todo el tráfico
 pasa por aquí
-
+```
 **Coste:** ~25 € (adaptador USB-Ethernet + switch básico)  
 **Dificultad:** Media  
 **Visibilidad:** Total — todo el tráfico de la red, incluyendo el lateral
@@ -506,6 +511,7 @@ Esto garantiza que ningún dispositivo pueda evadir el filtrado DNS aunque confi
 #### Opción 3 — Switch gestionable con SPAN port (recomendada)
 
 Se añade un switch gestionable barato entre el router y los dispositivos. Sin modificar la arquitectura existente, el switch clona todo el tráfico y lo envía a la Raspberry a través de un puerto espejo.
+```bash
 INTERNET → ROUTER → SWITCH GESTIONABLE → Dispositivos
 │
 │ Puerto espejo (SPAN)
@@ -514,7 +520,7 @@ INTERNET → ROUTER → SWITCH GESTIONABLE → Dispositivos
 RASPBERRY PI
 ntopng · tshark
 ven todo el tráfico
-
+```
 **Coste:** ~25-35 €  
 **Dificultad:** Baja — solo configuración web, sin tocar el sistema operativo  
 **Visibilidad:** Total  
