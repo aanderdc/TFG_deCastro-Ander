@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>S.I.E.M. - Ander de Castro</title>
@@ -208,11 +209,19 @@
 </head>
 <body>
 
-<div class="header-bar text-center">
+<div class="header-bar text-center" style="position:relative;">
     <div class="container">
         <h3 class="mb-1 fw-bold">SISTEMA DE SEGURIDAD DE RED</h3>
         <p class="mb-0 text-uppercase" style="font-size: 0.8rem; color: #94a3b8; letter-spacing: 2px;">TFG - Ander de Castro</p>
     </div>
+    <a href="/logout" style="position:absolute;top:50%;right:24px;transform:translateY(-50%);
+        color:#94a3b8;font-size:0.75rem;font-weight:600;text-decoration:none;
+        border:1px solid #334155;padding:6px 14px;border-radius:6px;
+        text-transform:uppercase;letter-spacing:1px;transition:all 0.2s;"
+        onmouseover="this.style.color='#fff';this.style.borderColor='#ef4444'"
+        onmouseout="this.style.color='#94a3b8';this.style.borderColor='#334155'">
+        Salir →
+    </a>
 </div>
 
 <div class="container">
@@ -252,37 +261,45 @@
     <!-- ACCESOS DIRECTOS -->
     <h5 class="text-center mt-5 mb-3 text-muted fw-bold text-uppercase" style="font-size: 0.9rem;">Accesos Directos</h5>
     <div class="row g-3 justify-content-center">
-        <div class="col-md-2"><a href="http://192.168.1.147/admin" target="_blank" class="nav-btn">PI-HOLE</a></div>
-        <div class="col-md-2"><a href="http://192.168.1.147:3000" target="_blank" class="nav-btn">GRAFANA</a></div>
-        <div class="col-md-2"><a href="http://192.168.1.147:3001" target="_blank" class="nav-btn">NTOPNG</a></div>
-        <div class="col-md-2"><a href="http://192.168.1.147:9090" target="_blank" class="nav-btn">PROMETHEUS</a></div>
+        <div class="col-md-2"><a href="http://{{ raspberry_ip }}/admin" target="_blank" class="nav-btn">PI-HOLE</a></div>
+        <div class="col-md-2"><a href="http://{{ raspberry_ip }}:3000" target="_blank" class="nav-btn">GRAFANA</a></div>
+        <div class="col-md-2"><a href="http://{{ raspberry_ip }}:3001" target="_blank" class="nav-btn">NTOPNG</a></div>
+        <div class="col-md-2"><a href="http://{{ raspberry_ip }}:9090" target="_blank" class="nav-btn">PROMETHEUS</a></div>
         <div class="col-md-2"><a href="/sniffer" class="nav-btn">SNIFFER</a></div>
+        <div class="col-md-2"><a href="/graficas" class="nav-btn">GRÁFICAS</a></div>
+        <div class="col-md-2"><a href="/lateral" class="nav-btn">RED INTERNA</a></div>
+        <div class="col-md-2"><a href="/contenedores" class="nav-btn">CONTENEDORES</a></div>
+        <div class="col-md-2" style="position:relative;">
+          <a href="/alertas" class="nav-btn" style="border-color:#fca5a5;">ALERTAS</a>
+          <span id="alertas-badge" style="display:none;position:absolute;top:-6px;right:-6px;
+            background:#dc2626;color:white;border-radius:50%;width:20px;height:20px;
+            font-size:0.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;">
+            0
+          </span>
+        </div>
     </div>
 
     <!-- TABLA TRAFICO SQLITE -->
     <div class="table-container">
-        <h6 class="fw-bold mb-3 text-uppercase small text-muted">Historial de Tráfico (Capturado en SQLite)</h6>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold mb-0 text-uppercase small text-muted">Dispositivos en Red — Tráfico en Vivo</h6>
+            <span class="text-muted small">Actualizado: <span id="hosts-refresh">—</span></span>
+        </div>
         <div class="table-responsive">
-            <table class="table align-middle">
+            <table class="table align-middle" id="hosts-table">
                 <thead class="table-light">
                     <tr>
-                        <th>Dispositivo</th>
-                        <th>IP</th>
+                        <th>Dispositivo / IP</th>
+                        <th>Fabricante</th>
+                        <th>MAC</th>
                         <th>Descarga (MB)</th>
-                        <th>Protocolo L7</th>
-                        <th>Hora</th>
+                        <th>Subida (MB)</th>
+                        <th>Flows</th>
+                        <th>Score</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for f in flujos %}
-                    <tr>
-                        <td class="fw-bold">{{ f[0] }}</td>
-                        <td class="text-muted small">{{ f[1] }}</td>
-                        <td><span class="badge bg-light text-dark border">{{ f[2] }} MB</span></td>
-                        <td><span class="badge-proto">{{ f[3] }}</span></td>
-                        <td class="text-muted small">{{ f[4].split(' ')[1] }}</td>
-                    </tr>
-                    {% endfor %}
+                <tbody id="hosts-tbody">
+                    <tr><td colspan="6" class="text-center text-muted small py-3">Cargando dispositivos...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -337,6 +354,59 @@
 
     setInterval(updateData, 5000);
     updateData();
+    // --- Hosts table refresh ---
+    async function updateHosts() {
+        try {
+            const r = await fetch('/api/hosts');
+            const d = await r.json();
+            if (!d.ok) return;
+
+            const tbody = document.getElementById('hosts-tbody');
+            tbody.innerHTML = d.hosts.map(h => {
+                const score = h.score > 50 
+                    ? `<span class="badge bg-danger">${h.score}</span>`
+                    : h.score > 0 
+                        ? `<span class="badge bg-warning text-dark">${h.score}</span>`
+                        : `<span class="badge bg-light text-dark border">${h.score}</span>`;
+                const fabricante = h.fabricante && h.fabricante !== 'Desconocido'
+                    ? `<span class="badge bg-light text-dark border">${h.fabricante}</span>`
+                    : `<span class="text-muted small">—</span>`;
+                return `<tr>
+                    <td class="fw-bold">${h.name}<br><span class="text-muted small">${h.ip}</span></td>
+                    <td>${fabricante}</td>
+                    <td class="text-muted small">${h.mac}</td>
+                    <td><span class="badge bg-light text-dark border">↓ ${h.rcvd_mb} MB</span></td>
+                    <td><span class="badge bg-light text-dark border">↑ ${h.sent_mb} MB</span></td>
+                    <td class="text-muted small">${h.flows}</td>
+                    <td>${score}</td>
+                </tr>`;
+            }).join('');
+
+            document.getElementById('hosts-refresh').textContent = new Date().toLocaleTimeString('es-ES');
+        } catch(e) { console.log('Error hosts:', e); }
+    }
+
+    setInterval(updateHosts, 15000);
+    updateHosts();
+
+    // --- Alertas badge ---
+    async function updateAlertasBadge() {
+        try {
+            const r = await fetch('/api/alertas?n=1');
+            const d = await r.json();
+            if (!d.ok) return;
+            const badge = document.getElementById('alertas-badge');
+            if (d.no_leidas > 0) {
+                badge.style.display = 'flex';
+                badge.textContent = d.no_leidas > 9 ? '9+' : d.no_leidas;
+            } else {
+                badge.style.display = 'none';
+            }
+        } catch(e) {}
+    }
+    setInterval(updateAlertasBadge, 30000);
+    updateAlertasBadge();
+
     setTimeout(() => { window.location.reload(); }, 120000);
 
     // --- Sniffer preview (últimos 15 paquetes) ---
