@@ -128,6 +128,9 @@ DASHBOARD_USER=admin
 DASHBOARD_PASSWORD=tu_contraseña_segura
 FLASK_SECRET_KEY=cadena_larga_y_aleatoria
 WIREGUARD_SERVERURL=tu_ip_publica
+# Opcional — notificaciones Telegram
+TELEGRAM_TOKEN=token_de_tu_bot
+TELEGRAM_CHAT_ID=tu_chat_id
 ```
 
 > Todas las credenciales se gestionan exclusivamente mediante variables de entorno. El archivo `.env` nunca se sube al repositorio.
@@ -169,8 +172,10 @@ Deberías ver los siguientes contenedores en estado `Up`:
 - **Dashboard principal:** métricas DNS en tiempo real (Pi-hole), dispositivos activos y consumo de ancho de banda.
 - **Sniffer:** visualización en tiempo real de las capturas de Tshark con filtrado por texto.
 - **Gráficas históricas:** tráfico total, consultas DNS y tráfico por dispositivo con selector de rango temporal (6h, 24h, 48h, 7 días).
-- **Alertas de seguridad:** registro automático con clasificación por severidad (Crítica, Alta, Media, Baja) basado en seis reglas de detección.
+- **Alertas de seguridad:** registro automático con clasificación por severidad (Crítica, Alta, Media, Baja) basado en seis reglas de detección. Incluye exportación a CSV para análisis externo.
 - **Red Interna:** mapa visual de conexiones entre dispositivos de la red local, con detección de escaneos internos y conexiones a puertos críticos.
+- **Contenedores:** panel de gestión de los microservicios Docker — estado, uptime, logs y botones de inicio/parada/reinicio por contenedor, con refresco automático cada 15 segundos.
+- **Notificaciones Telegram:** el motor de alertas envía automáticamente un mensaje cuando detecta una alerta CRÍTICA 🔴 o ALTA 🟠, sin necesidad de tener el dashboard abierto.
 
 ### 7.1. Reglas del Motor de Alertas (Heurística)
 
@@ -205,7 +210,7 @@ TFG_deCastro-Ander/
 │   └── ...
 ├── dashboard/               # Código fuente del dashboard Flask
 │   ├── app.py               # Backend principal (API, alertas, logging)
-│   └── templates/           # Plantillas HTML (index, sniffer, graficas, alertas, lateral)
+│   └── templates/           # Plantillas HTML (index, sniffer, graficas, alertas, lateral, contenedores)
 └── wireguard_config/        # Configuración de WireGuard (claves excluidas)
 ```
 
@@ -219,6 +224,7 @@ TFG_deCastro-Ander/
 - El acceso remoto se realiza exclusivamente a través de la VPN WireGuard.
 - Las claves privadas de WireGuard y los certificados TLS están excluidos del repositorio mediante `.gitignore`.
 - El historial de git ha sido limpiado con BFG Repo Cleaner para garantizar que ninguna credencial queda en commits anteriores.
+- Las notificaciones externas (Telegram) se configuran opcionalmente mediante variables de entorno; el sistema funciona sin ellas.
 
 ---
 
@@ -569,6 +575,9 @@ La arquitectura actual captura el tráfico que atraviesa la Raspberry Pi e incor
 - ✅ Captura de paquetes HTTP/DNS en tiempo real
 - ✅ Detección de escaneos internos (`LATERAL_SCAN`) y conexiones a puertos críticos (`LATERAL_PORT`)
 - ✅ Mapa visual de conexiones internas en tiempo real (sección **Red Interna**)
+- ✅ Panel de gestión de contenedores Docker con logs y control de estado (sección **Contenedores**)
+- ✅ Notificaciones automáticas por Telegram para alertas CRÍTICA y ALTA
+- ✅ Exportación de alertas a CSV para análisis forense externo
 - ⚠️ Tráfico lateral entre dispositivos que no involucran a la Raspberry: requiere port mirroring (sección 14.3)
 
 La implementación de cualquiera de las opciones de la sección 14.3 eliminaría la limitación restante y convertiría el sistema en una solución de visibilidad total de red.
