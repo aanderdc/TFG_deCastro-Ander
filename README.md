@@ -39,7 +39,12 @@
   - [14.3. Soluciones para visibilidad total de red](#143-soluciones-para-visibilidad-total-de-red)
   - [14.4. Comparativa de opciones](#144-comparativa-de-opciones)
   - [14.5. Estado actual del proyecto](#145-estado-actual-del-proyecto)
-- [15. Licencia](#15-licencia)
+- [15. Acceso Externo: DuckDNS y Let's Encrypt](#15-acceso-externo-duckdns-y-lets-encrypt)
+  - [15.1. Crear dominio DuckDNS](#151-crear-dominio-duckdns)
+  - [15.2. Instalar Certbot y obtener certificado](#152-instalar-certbot-y-obtener-certificado)
+  - [15.3. Configurar Nginx con el certificado válido](#153-configurar-nginx-con-el-certificado-válido)
+  - [15.4. Renovación automática](#154-renovación-automática)
+- [16. Licencia](#16-licencia)
 
 ---
 
@@ -584,6 +589,145 @@ La implementación de cualquiera de las opciones de la sección 14.3 eliminaría
 
 ---
 
-## 15. Licencia
+
+---
+
+## 15. Acceso Externo: DuckDNS y Let's Encrypt
+
+Por defecto el dashboard usa un certificado TLS autofirmado, lo que hace que el navegador muestre un aviso de "conexión no segura". Esta sección describe cómo obtener un certificado válido y gratuito mediante Let's Encrypt, usando DuckDNS como dominio dinámico para la Raspberry Pi.
+
+> **Resultado final:** acceso al dashboard en `https://tunombre.duckdns.org` con candado verde, sin avisos del navegador.
+
+---
+
+### 15.1. Crear dominio DuckDNS
+
+**1.** Ve a [duckdns.org](https://www.duckdns.org) e inicia sesión con Google o GitHub.
+
+**2.** En el campo "sub domain" escribe el nombre que quieras (ej: `siem-ander`) y pulsa **add domain**. Apunta el **token** que aparece en la parte superior.
+
+**3.** En la Raspberry, crea el script de actualización de IP:
+
+```bash
+mkdir -p ~/duckdns
+cat > ~/duckdns/duck.sh << 'EOF'
+echo url="https://www.duckdns.org/update?domains=TU_DOMINIO&token=TU_TOKEN&ip=" | curl -k -o ~/duckdns/duck.log -K -
+EOF
+chmod +x ~/duckdns/duck.sh
+```
+
+Sustituye `TU_DOMINIO` por el nombre elegido (sin `.duckdns.org`) y `TU_TOKEN` por el token de la web.
+
+**4.** Comprueba que funciona:
+
+```bash
+~/duckdns/duck.sh
+cat ~/duckdns/duck.log  # Debe mostrar: OK
+```
+
+**5.** Automatiza con cron para que se actualice cada 5 minutos:
+
+```bash
+crontab -e
+# Añade al final:
+*/5 * * * * ~/duckdns/duck.sh >/dev/null 2>&1
+```
+
+**6.** Actualiza el `.env` con tu dominio:
+
+```env
+WIREGUARD_SERVERURL=tunombre.duckdns.org
+```
+
+---
+
+### 15.2. Instalar Certbot y obtener certificado
+
+Certbot es la herramienta oficial de Let's Encrypt. Usamos el plugin `standalone` que levanta un servidor temporal en el puerto 80 para validar el dominio.
+
+> ⚠️ **Antes de ejecutar:** asegúrate de que el puerto 80 de tu router está redirigido a la IP de la Raspberry Pi (NAT/Port Forwarding). Solo es necesario durante la obtención del certificado.
+
+```bash
+# Instalar Certbot
+sudo apt update
+sudo apt install certbot -y
+
+# Detener Nginx temporalmente para liberar el puerto 80
+cd ~/TFG_deCastro-Ander/pihole
+docker compose stop nginx
+
+# Obtener el certificado
+sudo certbot certonly --standalone   --preferred-challenges http   -d tunombre.duckdns.org   --email tu@email.com   --agree-tos   --non-interactive
+
+# El certificado se guarda en:
+# /etc/letsencrypt/live/tunombre.duckdns.org/fullchain.pem
+# /etc/letsencrypt/live/tunombre.duckdns.org/privkey.pem
+```
+
+---
+
+### 15.3. Configurar Nginx con el certificado válido
+
+**1.** Copia los certificados al directorio de Nginx del proyecto:
+
+```bash
+sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/fullchain.pem         ~/TFG_deCastro-Ander/pihole/nginx/certs/fullchain.pem
+sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/privkey.pem         ~/TFG_deCastro-Ander/pihole/nginx/certs/privkey.pem
+sudo chmod 644 ~/TFG_deCastro-Ander/pihole/nginx/certs/*.pem
+```
+
+**2.** Actualiza la configuración de Nginx (`pihole/nginx/siem.conf`) para usar los nuevos certificados y tu dominio:
+
+```nginx
+server {
+    listen 80;
+    server_name tunombre.duckdns.org;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name tunombre.duckdns.org;
+
+    ssl_certificate     /etc/nginx/certs/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+
+    location / {
+        proxy_pass         http://127.0.0.1:5000;
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+**3.** Reinicia Nginx:
+
+```bash
+docker compose start nginx
+```
+
+**4.** Abre `https://tunombre.duckdns.org` en el navegador — verás el candado verde sin ningún aviso.
+
+---
+
+### 15.4. Renovación automática
+
+Los certificados de Let's Encrypt caducan cada 90 días. Automatiza la renovación con cron:
+
+```bash
+crontab -e
+# Añade al final:
+0 3 * * 1 docker compose -f ~/TFG_deCastro-Ander/pihole/docker-compose.yml stop nginx && sudo certbot renew --quiet && sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/fullchain.pem ~/TFG_deCastro-Ander/pihole/nginx/certs/fullchain.pem && sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/privkey.pem ~/TFG_deCastro-Ander/pihole/nginx/certs/privkey.pem && docker compose -f ~/TFG_deCastro-Ander/pihole/docker-compose.yml start nginx
+```
+
+Esto ejecuta cada lunes a las 3:00 AM: para Nginx, renueva si toca, copia los nuevos certificados y vuelve a arrancar Nginx.
+
+---
+
+## 16. Licencia
 
 Proyecto académico desarrollado como Trabajo de Fin de Grado.
