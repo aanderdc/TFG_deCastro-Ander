@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contenedores — S.I.E.M.</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root { --primary-dark: #0f172a; }
+    body { background-color: #f8fafc; color: #334155; font-family: 'Segoe UI', sans-serif; }
+    .header-bar {
+      background-color: var(--primary-dark); color: white;
+      padding: 1.2rem 0; border-bottom: 3px solid #334155;
+      margin-bottom: 2rem; position: relative;
+    }
+    .nav-btn {
+      background-color: white; color: var(--primary-dark);
+      text-decoration: none; padding: 0.8rem; border-radius: 8px;
+      display: inline-block; text-align: center; font-weight: 600;
+      border: 2px solid #e2e8f0; transition: all 0.2s; font-size: 0.85rem;
+    }
+    .nav-btn:hover { background-color: var(--primary-dark); color: white; }
+    .nav-btn.active { background: var(--primary-dark); color: white; }
+    .card-stat {
+      background: white; border-radius: 10px; padding: 1.2rem 1.5rem;
+      border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .label { color: #64748b; text-transform: uppercase; font-size: 0.7rem; font-weight: 800; }
+    .value { font-size: 1.8rem; font-weight: 700; color: #1e293b; }
+    .table-container {
+      background: white; border-radius: 10px; padding: 1.5rem;
+      border: 1px solid #e2e8f0; margin-top: 1.5rem;
+    }
+    .live-dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      background: #22c55e; margin-right: 6px; animation: blink 1.2s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+    /* Estado badges */
+    .badge-running { background: #dcfce7; color: #166534; font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; font-weight: 700; }
+    .badge-exited  { background: #fee2e2; color: #991b1b; font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; font-weight: 700; }
+    .badge-paused  { background: #fef9c3; color: #854d0e; font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; font-weight: 700; }
+
+    /* Fila de acciones */
+    .btn-accion {
+      font-size: 0.72rem; padding: 3px 10px; border-radius: 5px;
+      font-weight: 600; border: none; cursor: pointer; transition: opacity 0.2s;
+    }
+    .btn-accion:hover { opacity: 0.8; }
+    .btn-restart { background: #e0f2fe; color: #0369a1; }
+    .btn-stop    { background: #fee2e2; color: #991b1b; }
+    .btn-start   { background: #dcfce7; color: #166534; }
+    .btn-logs    { background: #f1f5f9; color: #475569; }
+
+    /* Modal de logs */
+    #logs-modal-body {
+      background: #0f172a; color: #94a3b8; font-family: monospace;
+      font-size: 0.75rem; padding: 1rem; border-radius: 6px;
+      max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+    }
+
+    .spinner { display: inline-block; width: 14px; height: 14px;
+      border: 2px solid #e2e8f0; border-top-color: #0f172a;
+      border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<div class="header-bar text-center">
+  <div class="container">
+    <h3 class="mb-1 fw-bold">CONTENEDORES DOCKER</h3>
+    <p class="mb-0 text-uppercase" style="font-size:0.8rem;color:#94a3b8;letter-spacing:2px;">TFG — Ander de Castro</p>
+  </div>
+  <a href="/logout" style="position:absolute;top:50%;right:24px;transform:translateY(-50%);
+      color:#94a3b8;font-size:0.75rem;font-weight:600;text-decoration:none;
+      border:1px solid #334155;padding:6px 14px;border-radius:6px;text-transform:uppercase;letter-spacing:1px;"
+      onmouseover="this.style.color='#fff';this.style.borderColor='#ef4444'"
+      onmouseout="this.style.color='#94a3b8';this.style.borderColor='#334155'">
+      Salir →
+  </a>
+</div>
+
+<div class="container">
+  <!-- NAV -->
+  <div class="d-flex gap-2 mb-4 flex-wrap">
+    <a href="/" class="nav-btn">Dashboard</a>
+    <a href="/sniffer" class="nav-btn">Sniffer</a>
+    <a href="/graficas" class="nav-btn">Gráficas</a>
+    <a href="/alertas" class="nav-btn">Alertas</a>
+    <a href="/lateral" class="nav-btn">Red Interna</a>
+    <a href="/contenedores" class="nav-btn active">Contenedores</a>
+  </div>
+
+  <!-- STATS -->
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+      <div class="card-stat">
+        <div class="label">Total</div>
+        <div class="value" id="stat-total">—</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card-stat">
+        <div class="label">Activos</div>
+        <div class="value text-success" id="stat-running">—</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card-stat">
+        <div class="label">Detenidos</div>
+        <div class="value text-danger" id="stat-exited">—</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card-stat">
+        <div class="label">Última actualización</div>
+        <div class="value" style="font-size:1rem;" id="stat-refresh">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLA -->
+  <div class="table-container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <span class="live-dot"></span>
+        <span class="fw-bold small text-uppercase" style="font-size:0.75rem;letter-spacing:1px;">
+          Estado de Microservicios
+        </span>
+      </div>
+      <button onclick="refreshContenedores()" class="btn btn-sm btn-outline-secondary">↻ Actualizar</button>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Contenedor</th>
+            <th>Imagen</th>
+            <th>Estado</th>
+            <th>Uptime</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="contenedores-tbody">
+          <tr><td colspan="5" class="text-center text-muted py-4">
+            <span class="spinner"></span> Cargando...
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Logs -->
+<div class="modal fade" id="logsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#0f172a;color:white;border:none;">
+        <h6 class="modal-title fw-bold" id="logs-modal-title">Logs</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-2">
+        <div id="logs-modal-body">Cargando...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script>
+  const logsModal = new bootstrap.Modal(document.getElementById('logsModal'));
+
+  async function refreshContenedores() {
+    try {
+      const r = await fetch('/api/contenedores');
+      const d = await r.json();
+      if (!d.ok) { console.error(d.error); return; }
+
+      const running = d.contenedores.filter(c => c.estado === 'running').length;
+      const exited  = d.contenedores.filter(c => c.estado !== 'running').length;
+      document.getElementById('stat-total').textContent   = d.total;
+      document.getElementById('stat-running').textContent = running;
+      document.getElementById('stat-exited').textContent  = exited;
+      document.getElementById('stat-refresh').textContent = new Date().toLocaleTimeString('es-ES');
+
+      const tbody = document.getElementById('contenedores-tbody');
+      tbody.innerHTML = d.contenedores.map(c => {
+        const badgeClass = c.estado === 'running' ? 'badge-running'
+                         : c.estado === 'paused'  ? 'badge-paused' : 'badge-exited';
+        const estadoLabel = c.estado === 'running' ? '● Activo'
+                          : c.estado === 'paused'  ? '⏸ Pausado' : '● Detenido';
+
+        const btnStart   = c.estado !== 'running'
+          ? `<button class="btn-accion btn-start"   onclick="accion('${c.nombre}','start')">▶ Iniciar</button>` : '';
+        const btnStop    = c.estado === 'running'
+          ? `<button class="btn-accion btn-stop"    onclick="accion('${c.nombre}','stop')">■ Detener</button>` : '';
+        const btnRestart = c.estado === 'running'
+          ? `<button class="btn-accion btn-restart" onclick="accion('${c.nombre}','restart')">↺ Reiniciar</button>` : '';
+
+        return `<tr id="row-${c.nombre}">
+          <td class="fw-bold small">${c.nombre}</td>
+          <td class="small text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+              title="${c.imagen}">${c.imagen}</td>
+          <td><span class="${badgeClass}">${estadoLabel}</span></td>
+          <td class="small">${c.uptime}</td>
+          <td class="d-flex gap-1 flex-wrap">
+            ${btnStart}${btnStop}${btnRestart}
+            <button class="btn-accion btn-logs" onclick="verLogs('${c.nombre}')">📄 Logs</button>
+          </td>
+        </tr>`;
+      }).join('');
+    } catch(e) { console.error('[contenedores]', e); }
+  }
+
+  async function accion(nombre, tipo) {
+    const row = document.getElementById(`row-${nombre}`);
+    if (row) row.style.opacity = '0.5';
+    try {
+      const r = await fetch(`/api/contenedores/${nombre}/${tipo}`, { method: 'POST' });
+      const d = await r.json();
+      if (!d.ok) alert(`Error: ${d.error}`);
+      await refreshContenedores();
+    } catch(e) {
+      alert(`Error de red: ${e}`);
+    }
+    if (row) row.style.opacity = '1';
+  }
+
+  async function verLogs(nombre) {
+    document.getElementById('logs-modal-title').textContent = `Logs — ${nombre}`;
+    document.getElementById('logs-modal-body').textContent = 'Cargando...';
+    logsModal.show();
+    try {
+      const r = await fetch(`/api/contenedores/${nombre}/logs`);
+      const d = await r.json();
+      const body = document.getElementById('logs-modal-body');
+      body.textContent = d.ok ? (d.logs || '(sin logs recientes)') : `Error: ${d.error}`;
+      body.scrollTop = body.scrollHeight;
+    } catch(e) {
+      document.getElementById('logs-modal-body').textContent = `Error: ${e}`;
+    }
+  }
+
+  refreshContenedores();
+  setInterval(refreshContenedores, 15000);
+</script>
+</body>
+</html>

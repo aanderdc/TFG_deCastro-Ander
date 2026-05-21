@@ -10,27 +10,31 @@ import os
 import pytz
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "")
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'cambia_esto_en_produccion')
 from datetime import timedelta
 app.permanent_session_lifetime = timedelta(hours=24)
 
 # --- CONFIGURACIÓN (desde variables de entorno) ---
 RASPBERRY_IP    = os.environ.get('RASPBERRY_IP', '127.0.0.1')
-PIHOLE_BASE_URL = f"http://{os.environ.get("RASPBERRY_IP","127.0.0.1")}/api"
-PASSWORD_PIHOLE = os.environ.get("PIHOLE_PASSWORD", "")
+PIHOLE_BASE_URL = f"http://{RASPBERRY_IP}/api"
+PASSWORD_PIHOLE = os.environ.get('PIHOLE_PASSWORD', '')
 
 NTOPNG_BASE = "http://127.0.0.1:3001"
 NTOPNG_USER = os.environ.get('NTOPNG_USER', 'admin')
-NTOPNG_PASS = os.environ.get("NTOPNG_PASSWORD", "")
+NTOPNG_PASS = os.environ.get('NTOPNG_PASSWORD', '')
 
 ntopng_session = requests.Session()
 ntopng_authenticated = False
 
 DB_PATH = 'data/historial_red.db'
 ADMIN_USER = os.environ.get('DASHBOARD_USER', 'admin')
-ADMIN_PASS = os.environ.get("DASHBOARD_PASSWORD", "")
+ADMIN_PASS = os.environ.get('DASHBOARD_PASSWORD', '')
 
 TSHARK_LOG_PATH = '/tshark_logs/tshark_capture.txt'
+
+# --- TELEGRAM ---
+TELEGRAM_TOKEN   = os.environ.get('TELEGRAM_TOKEN', '')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '')
 
 current_sid = None
 madrid_tz = pytz.timezone('Europe/Madrid')
@@ -146,6 +150,21 @@ def get_fabricante(mac):
         print(f"[MAC] Error: {e}")
         return 'Desconocido'
 
+
+def enviar_telegram(mensaje):
+    """Envía una notificación a Telegram. Solo si están configurados token y chat_id."""
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        return
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        requests.post(url, json={
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": mensaje,
+            "parse_mode": "HTML"
+        }, timeout=5)
+    except Exception as e:
+        print(f"[Telegram] Error al enviar: {e}")
+
 def registrar_alerta(cursor, tipo, ip, descripcion, severidad='MEDIA'):
     ahora = get_ahora_madrid()
     # Evitar duplicados en los últimos 10 minutos
@@ -157,6 +176,17 @@ def registrar_alerta(cursor, tipo, ip, descripcion, severidad='MEDIA'):
         cursor.execute('''INSERT INTO alertas (fecha, tipo, ip, descripcion, severidad)
                           VALUES (?, ?, ?, ?, ?)''',
                        (ahora, tipo, ip, descripcion, severidad))
+        # Notificación Telegram solo para CRITICA y ALTA
+        if severidad in ('CRITICA', 'ALTA'):
+            iconos = {'CRITICA': '🔴', 'ALTA': '🟠'}
+            icono = iconos.get(severidad, '⚪')
+            enviar_telegram(
+                f"{icono} <b>ALERTA {severidad}</b>\n"
+                f"<b>Tipo:</b> {tipo}\n"
+                f"<b>IP:</b> {ip}\n"
+                f"<b>Descripción:</b> {descripcion}\n"
+                f"<b>Hora:</b> {ahora}"
+            )
         print(f"[ALERTA] {severidad} — {tipo} — {ip} — {descripcion}")
 
 def detectar_alertas(cursor, hosts, dns_data=None):
@@ -201,7 +231,7 @@ def detectar_alertas(cursor, hosts, dns_data=None):
                 f'Score de amenaza: {score}', severidad)
 
         # 2. Dispositivo nuevo
-        if ip not in ips_conocidas and ip != os.environ.get('RASPBERRY_IP', '127.0.0.1'):
+        if ip not in ips_conocidas and ip != '192.168.1.147':
             registrar_alerta(cursor, 'DISPOSITIVO_NUEVO', ip,
                 f'Nueva IP detectada en la red: {ip}', 'MEDIA')
 
@@ -547,6 +577,28 @@ def api_alertas():
         "no_leidas": no_leidas
     })
 
+
+@app.route('/api/alertas/export/csv')
+@login_required
+def api_alertas_export_csv():
+    import csv, io
+    from flask import Response
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        'SELECT id, fecha, tipo, ip, descripcion, severidad FROM alertas ORDER BY id DESC'
+    ).fetchall()
+    conn.close()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Fecha', 'Tipo', 'IP', 'Descripcion', 'Severidad'])
+    writer.writerows(rows)
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={"Content-Disposition": "attachment; filename=alertas_siem.csv"}
+    )
+
 @app.route('/api/alertas/clear', methods=['POST'])
 @login_required
 def api_alertas_clear():
@@ -713,6 +765,95 @@ def api_lateral_clear():
     conn.close()
     return jsonify({"ok": True})
 
+
+
+# --- RUTAS CONTENEDORES DOCKER ---
+
+@app.route('/contenedores')
+@login_required
+def contenedores():
+    return render_template('contenedores.html')
+
+@app.route('/api/contenedores')
+@login_required
+def api_contenedores():
+    try:
+        client = docker_sdk.from_env()
+        containers = client.containers.list(all=True)
+        resultado = []
+        for c in containers:
+            # Calcular uptime legible
+            uptime = "—"
+            if c.status == "running":
+                started = c.attrs.get("State", {}).get("StartedAt", "")
+                if started:
+                    try:
+                        from datetime import timezone
+                        dt = datetime.fromisoformat(started[:19])
+                        dt = dt.replace(tzinfo=timezone.utc)
+                        now_utc = datetime.now(timezone.utc)
+                        diff = now_utc - dt
+                        h, rem = divmod(int(diff.total_seconds()), 3600)
+                        m = rem // 60
+                        uptime = f"{h}h {m}m" if h > 0 else f"{m}m"
+                    except:
+                        uptime = "—"
+            resultado.append({
+                "id":     c.short_id,
+                "nombre": c.name,
+                "imagen": c.image.tags[0] if c.image.tags else c.image.short_id,
+                "estado": c.status,
+                "uptime": uptime,
+            })
+        # Ordenar: running primero, luego exited
+        resultado.sort(key=lambda x: (0 if x["estado"] == "running" else 1, x["nombre"]))
+        return jsonify({"ok": True, "contenedores": resultado, "total": len(resultado)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route('/api/contenedores/<nombre>/restart', methods=['POST'])
+@login_required
+def api_contenedor_restart(nombre):
+    try:
+        client = docker_sdk.from_env()
+        c = client.containers.get(nombre)
+        c.restart(timeout=10)
+        return jsonify({"ok": True, "estado": "restarted"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route('/api/contenedores/<nombre>/stop', methods=['POST'])
+@login_required
+def api_contenedor_stop(nombre):
+    try:
+        client = docker_sdk.from_env()
+        c = client.containers.get(nombre)
+        c.stop(timeout=10)
+        return jsonify({"ok": True, "estado": "stopped"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route('/api/contenedores/<nombre>/start', methods=['POST'])
+@login_required
+def api_contenedor_start(nombre):
+    try:
+        client = docker_sdk.from_env()
+        c = client.containers.get(nombre)
+        c.start()
+        return jsonify({"ok": True, "estado": "started"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route('/api/contenedores/<nombre>/logs')
+@login_required
+def api_contenedor_logs(nombre):
+    try:
+        client = docker_sdk.from_env()
+        c = client.containers.get(nombre)
+        logs = c.logs(tail=50, timestamps=False).decode('utf-8', errors='replace')
+        return jsonify({"ok": True, "logs": logs})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 # --- RUTAS CONTROL TSHARK ---
 import docker as docker_sdk
