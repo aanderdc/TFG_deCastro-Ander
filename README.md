@@ -44,12 +44,12 @@
   - [15.2. Instalar Certbot y obtener certificado](#152-instalar-certbot-y-obtener-certificado)
   - [15.3. Configurar Nginx con el certificado válido](#153-configurar-nginx-con-el-certificado-válido)
   - [15.4. Renovación automática](#154-renovación-automática)
-- [16. Licencia](#16-licencia)
-- [17. Resolución de Incidencias del Despliegue Real](#17-resolución-de-incidencias-del-despliegue-real)
-  - [17.1. Certificados TLS no encontrados](#171-certificados-tls-no-encontrados)
-  - [17.2. Credenciales del dashboard incorrectas](#172-credenciales-del-dashboard-incorrectas)
-  - [17.3. Grafana no arranca por permisos](#173-grafana-no-arranca-por-permisos)
-  - [17.4. SSH — no resuelve raspberrypi.local](#174-ssh--no-resuelve-raspberrypilocal)
+- [16. Resolución de Incidencias del Despliegue Real](#16-resolución-de-incidencias-del-despliegue-real)
+  - [16.1. Certificados TLS no encontrados](#161-certificados-tls-no-encontrados)
+  - [16.2. Credenciales del dashboard incorrectas](#162-credenciales-del-dashboard-incorrectas)
+  - [16.3. Grafana no arranca por permisos](#163-grafana-no-arranca-por-permisos)
+  - [16.4. SSH — no resuelve raspberrypi.local](#164-ssh--no-resuelve-raspberrypilocal)
+- [17. Licencia](#17-licencia)
 
 ---
 
@@ -756,13 +756,15 @@ Esto ejecuta cada lunes a las 3:00 AM: para Nginx, renueva si toca, copia los nu
 
 ---
 
-## 17. Resolución de Incidencias del Despliegue Real
+---
+
+## 16. Resolución de Incidencias del Despliegue Real
 
 Esta sección documenta los problemas encontrados durante el primer despliegue limpio desde el repositorio en una Raspberry Pi real, y sus soluciones. Es complementaria a la sección 13 (FAQ general).
 
 ---
 
-### 17.1. Certificados TLS no encontrados
+### 16.1. Certificados TLS no encontrados
 
 **Síntoma:** Nginx no arranca. El log muestra:
 ```
@@ -791,7 +793,7 @@ docker restart nginx-siem
 
 ---
 
-### 17.2. Credenciales del dashboard incorrectas
+### 16.2. Credenciales del dashboard incorrectas
 
 **Síntoma:** El dashboard muestra "Credenciales incorrectas" aunque el `.env` tiene los valores correctos.
 
@@ -815,7 +817,7 @@ docker compose up -d --force-recreate
 
 ---
 
-### 17.3. Grafana no arranca por permisos
+### 16.3. Grafana no arranca por permisos
 
 **Síntoma:** Grafana aparece como "Detenido" en la página de Contenedores. El log muestra:
 ```
@@ -834,7 +836,7 @@ Accede a Grafana en `http://IP_RASPBERRY:3000` con usuario `admin` y la contrase
 
 ---
 
-### 17.4. SSH — no resuelve raspberrypi.local
+### 16.4. SSH — no resuelve raspberrypi.local
 
 **Síntoma:** Al intentar conectarse por SSH aparece:
 ```
@@ -852,6 +854,11 @@ ssh ander@192.168.1.X
 
 ---
 
-## 16. Licencia
+---
+
+
+
+
+## 17. Licencia
 
 Proyecto académico desarrollado como Trabajo de Fin de Grado.
