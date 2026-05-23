@@ -231,7 +231,7 @@ def detectar_alertas(cursor, hosts, dns_data=None):
                 f'Score de amenaza: {score}', severidad)
 
         # 2. Dispositivo nuevo
-        if ip not in ips_conocidas and ip != '192.168.1.147':
+        if ip not in ips_conocidas and ip != os.environ.get('RASPBERRY_IP', '127.0.0.1'):
             registrar_alerta(cursor, 'DISPOSITIVO_NUEVO', ip,
                 f'Nueva IP detectada en la red: {ip}', 'MEDIA')
 
