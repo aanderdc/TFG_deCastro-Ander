@@ -30,10 +30,3 @@ wireguard_config/peer2/
 wireguard_config/peer3/
 wireguard_config/server/
 pihole/etc-pihole/cli_pw
-pihole/etc-pihole/listsCache/
-pihole/etc-pihole/gravity_backups/
-pihole/etc-pihole/pihole-FTL.db*
-dashboard/data/*.db
-pihole/ntopng_data/
-pihole/grafana_data/
-pihole/tshark_logs/
