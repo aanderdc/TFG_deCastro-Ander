@@ -15,3 +15,17 @@ secretos.txt
 pihole/pihole.env
 bfg.jar
 .bfg-report/
+pihole/etc-pihole/pihole-FTL.db*
+pihole/etc-pihole/gravity_backups/
+pihole/etc-pihole/listsCache/
+pihole/etc-pihole/cli_pw
+pihole/etc-pihole/tls.crt
+pihole/etc-pihole/tls_ca.crt
+pihole/etc-pihole/versions
+pihole/etc-pihole/logrotate
+pihole/grafana_data/grafana.db
+dashboard/data/
+wireguard_config/peer1/
+wireguard_config/peer2/
+wireguard_config/peer3/
+wireguard_config/server/
