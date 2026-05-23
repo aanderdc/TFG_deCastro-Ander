@@ -1,4 +1,4 @@
-# Sistema de Monitorización y Gestión de Red de Bajo Coste
+# Sistema de Monitorización y Gestión de Red de Bajo Coste para entornos PYME
 ### TFG — Grado en Ingeniería en Tecnología de Telecomunicación
 **Autor:** Ander de Castro
 
@@ -791,11 +791,13 @@ Eliminado `env_file` innecesario del servicio Grafana.
 ### 17.5. Verificación post-hardening
 
 Comprobación desde un equipo externo en la misma red local:
+```bash
 curl http://IP_RASPBERRY:9090/-/healthy  → 000 (inaccesible) ✅
 curl http://IP_RASPBERRY:9100/metrics    → 000 (inaccesible) ✅
 curl http://IP_RASPBERRY:9167/metrics    → 000 (inaccesible) ✅
 curl http://IP_RASPBERRY:3001/           → 302 (login requerido) ✅
 redis-cli -h IP_RASPBERRY ping           → NOAUTH required ✅
+```
 
 ### 17.6. Superficie de ataque residual
 
