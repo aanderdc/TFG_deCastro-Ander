@@ -45,6 +45,11 @@
   - [15.3. Configurar Nginx con el certificado válido](#153-configurar-nginx-con-el-certificado-válido)
   - [15.4. Renovación automática](#154-renovación-automática)
 - [16. Licencia](#16-licencia)
+- [17. Resolución de Incidencias del Despliegue Real](#17-resolución-de-incidencias-del-despliegue-real)
+  - [17.1. Certificados TLS no encontrados](#171-certificados-tls-no-encontrados)
+  - [17.2. Credenciales del dashboard incorrectas](#172-credenciales-del-dashboard-incorrectas)
+  - [17.3. Grafana no arranca por permisos](#173-grafana-no-arranca-por-permisos)
+  - [17.4. SSH — no resuelve raspberrypi.local](#174-ssh--no-resuelve-raspberrypilocal)
 
 ---
 
@@ -139,6 +144,8 @@ TELEGRAM_CHAT_ID=tu_chat_id
 ```
 
 > Todas las credenciales se gestionan exclusivamente mediante variables de entorno. El archivo `.env` nunca se sube al repositorio.
+
+> ⚠️ **Importante:** el servicio `mi_dashboard` lee las variables directamente del `.env` mediante `env_file`. Si añades variables nuevas al `.env`, reinicia el contenedor con `docker compose restart mi_dashboard` para que las cargue.
 
 ### 5.3. Inicialización del Entorno Multi-Contenedor
 
@@ -358,7 +365,25 @@ Comprueba que estás en la misma red Wi-Fi que la Raspberry Pi.
 Verifica que el DNS de tu router apunta a la IP correcta de la Raspberry Pi (Paso 6).
 
 **Olvidé la contraseña del dashboard**  
-Edita el archivo `.env`, cambia `DASHBOARD_PASSWORD` y reinicia con `docker compose restart`.
+Edita el archivo `.env`, cambia `DASHBOARD_PASSWORD` y reinicia con `docker compose restart mi_dashboard`.
+
+**El dashboard muestra "Credenciales incorrectas" aunque el `.env` es correcto**  
+El contenedor puede haber arrancado antes de leer el `.env`. Fuerza una recreación completa:
+```bash
+docker compose down
+docker compose up -d --force-recreate
+```
+Verifica que las variables llegaron al contenedor:
+```bash
+docker exec mi_dashboard env | grep DASHBOARD
+```
+
+**Grafana no arranca — error "permission denied" en `/var/lib/grafana`**  
+Los volúmenes de Grafana necesitan pertenecer al usuario interno de Grafana (UID 472):
+```bash
+sudo chown -R 472:472 ~/TFG_deCastro-Ander/pihole/grafana_data
+docker compose restart grafana
+```
 
 ---
 
@@ -725,6 +750,105 @@ crontab -e
 ```
 
 Esto ejecuta cada lunes a las 3:00 AM: para Nginx, renueva si toca, copia los nuevos certificados y vuelve a arrancar Nginx.
+
+---
+
+
+---
+
+## 17. Resolución de Incidencias del Despliegue Real
+
+Esta sección documenta los problemas encontrados durante el primer despliegue limpio desde el repositorio en una Raspberry Pi real, y sus soluciones. Es complementaria a la sección 13 (FAQ general).
+
+---
+
+### 17.1. Certificados TLS no encontrados
+
+**Síntoma:** Nginx no arranca. El log muestra:
+```
+cannot load certificate key "/etc/nginx/certs/siem.key": No such file or directory
+```
+
+**Causa:** Los certificados TLS autofirmados no están en el repositorio (están en `.gitignore` por seguridad). Al clonar el repo en una Raspberry nueva, el directorio `nginx/certs/` está vacío.
+
+**Solución A — Copiar certificados de una instalación anterior:**
+```bash
+mkdir -p ~/TFG_deCastro-Ander/pihole/nginx/certs
+sudo cp ~/tfg_red_backup/pihole/nginx/certs/siem.key ~/TFG_deCastro-Ander/pihole/nginx/certs/
+sudo cp ~/tfg_red_backup/pihole/nginx/certs/siem.crt ~/TFG_deCastro-Ander/pihole/nginx/certs/
+sudo chmod 644 ~/TFG_deCastro-Ander/pihole/nginx/certs/*
+docker restart nginx-siem
+```
+
+**Solución B — Generar certificados autofirmados nuevos (instalación desde cero):**
+```bash
+mkdir -p ~/TFG_deCastro-Ander/pihole/nginx/certs
+openssl req -x509 -nodes -days 3650 -newkey rsa:2048   -keyout ~/TFG_deCastro-Ander/pihole/nginx/certs/siem.key   -out ~/TFG_deCastro-Ander/pihole/nginx/certs/siem.crt   -subj "/CN=siem-dashboard/O=TFG/C=ES"
+docker restart nginx-siem
+```
+
+> Para obtener un certificado válido (sin aviso del navegador) sigue la guía de la sección 15.
+
+---
+
+### 17.2. Credenciales del dashboard incorrectas
+
+**Síntoma:** El dashboard muestra "Credenciales incorrectas" aunque el `.env` tiene los valores correctos.
+
+**Causa:** El contenedor `mi_dashboard` no recibe las variables de entorno si no se especifica `env_file` en el `docker-compose.yml`, o si arrancó antes de que se editara el `.env`.
+
+**Verificación:**
+```bash
+docker exec mi_dashboard env | grep -E "DASHBOARD|FLASK"
+```
+Si no devuelve nada o muestra valores vacíos, el contenedor no lee el `.env`.
+
+**Solución:**
+```bash
+# Verificar que docker-compose.yml tiene env_file en el bloque dashboard:
+grep -A2 "env_file" ~/TFG_deCastro-Ander/pihole/docker-compose.yml
+
+# Recrear completamente
+docker compose down
+docker compose up -d --force-recreate
+```
+
+---
+
+### 17.3. Grafana no arranca por permisos
+
+**Síntoma:** Grafana aparece como "Detenido" en la página de Contenedores. El log muestra:
+```
+Error: ✗ failed to create directory "/var/lib/grafana/png": permission denied
+```
+
+**Causa:** El directorio `grafana_data/` fue creado por root (Docker) y Grafana necesita escribir en él con su usuario interno (UID 472).
+
+**Solución:**
+```bash
+sudo chown -R 472:472 ~/TFG_deCastro-Ander/pihole/grafana_data
+docker compose restart grafana
+```
+
+Accede a Grafana en `http://IP_RASPBERRY:3000` con usuario `admin` y la contraseña configurada en `GRAFANA_PASSWORD` del `.env`.
+
+---
+
+### 17.4. SSH — no resuelve raspberrypi.local
+
+**Síntoma:** Al intentar conectarse por SSH aparece:
+```
+ssh: Could not resolve hostname raspberrypi.local: Name or service not known
+```
+
+**Causa:** En redes WiFi Mesh o con ciertos routers, la resolución mDNS de `raspberrypi.local` no funciona correctamente.
+
+**Solución:** Usa la IP directa de la Raspberry Pi. Encuéntrala en el panel de administración de tu router (`http://192.168.1.1`) en la sección de dispositivos conectados:
+```bash
+ssh ander@192.168.1.X
+```
+
+> El usuario por defecto de Raspberry Pi OS es `pi`, pero si creaste un usuario personalizado durante la instalación (como `ander`), usa ese.
 
 ---
 
