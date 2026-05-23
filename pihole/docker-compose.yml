@@ -21,14 +21,14 @@ services:
     container_name: node-exporter
     restart: unless-stopped
     ports:
-      - "9100:9100"
+      - "127.0.0.1:9100:9100"
 
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     restart: unless-stopped
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
 
@@ -53,20 +53,18 @@ services:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
-    env_file:
-      - .env
     volumes:
       - ./grafana_data:/var/lib/grafana
     restart: unless-stopped
 
   redis:
     image: redis:alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD} --save "" --appendonly no
     container_name: redis-ntopng
     restart: unless-stopped
     network_mode: "host"
     volumes:
       - ./ntopng_redis:/data
-    command: redis-server --save "" --appendonly no
 
   ntopng:
     image: ntop/ntopng_arm64.dev:latest
@@ -79,7 +77,7 @@ services:
     volumes:
       - ./ntopng_data:/var/lib/ntopng
       - ./ntopng_redis:/var/lib/redis
-    command: ntopng -i wlan0 -w 3001 --community --disable-login=1 -r 127.0.0.1
+    command: ntopng -i wlan0 -w 3001 --community -r 127.0.0.1:6379:${REDIS_PASSWORD}@0
     depends_on:
       - redis
 
@@ -118,12 +116,14 @@ services:
     volumes:
       - ../dashboard:/app
       - ./tshark_logs:/tshark_logs
-      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DOCKER_HOST=tcp://127.0.0.1:2375
     working_dir: /app
     command: >
       sh -c "pip show flask > /dev/null 2>&1 || pip install -q flask requests pytz docker && python app.py"
     depends_on:
       - pihole
+      - docker-proxy
 
   wireguard:
     image: linuxserver/wireguard:latest
@@ -147,6 +147,23 @@ services:
       - ../wireguard_config:/config
       - /lib/modules:/lib/modules
     restart: unless-stopped
+
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy
+    container_name: docker-proxy
+    restart: unless-stopped
+    network_mode: "host"
+    environment:
+      - CONTAINERS=1
+      - START=1
+      - STOP=1
+      - RESTART=1
+      - LOGS=1
+      - INFO=1
+      - POST=1
+      - IMAGES=1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 
 networks:
   monitoring:
