@@ -741,15 +741,17 @@ docker compose start nginx
 
 ### 15.4. Renovación automática
 
-Los certificados de Let's Encrypt caducan cada 90 días. Automatiza la renovación con cron:
+Los certificados de Let's Encrypt caducan cada 90 días. Certbot instala automáticamente un timer de systemd que intenta la renovación dos veces al día — no necesitas configurar nada adicional para la renovación del certificado en sí.
+
+Sin embargo, después de renovar hay que copiar los nuevos certificados al directorio de Nginx. Añade esto al cron:
 
 ```bash
 crontab -e
 # Añade al final:
-0 3 * * 1 docker compose -f ~/TFG_deCastro-Ander/pihole/docker-compose.yml stop nginx && sudo certbot renew --quiet && sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/fullchain.pem ~/TFG_deCastro-Ander/pihole/nginx/certs/fullchain.pem && sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/privkey.pem ~/TFG_deCastro-Ander/pihole/nginx/certs/privkey.pem && docker compose -f ~/TFG_deCastro-Ander/pihole/docker-compose.yml start nginx
+0 3 * * 1 sudo certbot renew --quiet && sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/fullchain.pem ~/TFG_deCastro-Ander/pihole/nginx/certs/siem.crt && sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/privkey.pem ~/TFG_deCastro-Ander/pihole/nginx/certs/siem.key && docker restart nginx-siem
 ```
 
-Esto ejecuta cada lunes a las 3:00 AM: para Nginx, renueva si toca, copia los nuevos certificados y vuelve a arrancar Nginx.
+Esto se ejecuta cada lunes a las 3:00 AM: renueva si toca, copia los nuevos certificados con los nombres correctos y reinicia Nginx.
 
 ---
 
@@ -861,4 +863,4 @@ ssh ander@192.168.1.X
 
 ## 17. Licencia
 
-Proyecto académico desarrollado como Trabajo de Fin de Grado para la EHU, Escuela de Ingeniería de Bilbao.
+Proyecto académico desarrollado como Trabajo de Fin de Grado.
