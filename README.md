@@ -1,6 +1,6 @@
 # Sistema de Monitorización y Gestión de Red de Bajo Coste
 ### TFG — Grado en Ingeniería en Tecnología de Telecomunicación
-**Autor:** Ander de Castro  
+**Autor:** Ander de Castro
 
 ---
 
@@ -49,7 +49,17 @@
   - [16.2. Credenciales del dashboard incorrectas](#162-credenciales-del-dashboard-incorrectas)
   - [16.3. Grafana no arranca por permisos](#163-grafana-no-arranca-por-permisos)
   - [16.4. SSH — no resuelve raspberrypi.local](#164-ssh--no-resuelve-raspberrypilocal)
-- [17. Licencia](#17-licencia)
+  - [16.5. ntopng no conecta con Redis tras añadir contraseña](#165-ntopng-no-conecta-con-redis-tras-añadir-contraseña)
+  - [16.6. Docker socket proxy — error 403 en panel de contenedores](#166-docker-socket-proxy--error-403-en-panel-de-contenedores)
+  - [16.7. Contraseña de Redis con caracteres especiales](#167-contraseña-de-redis-con-caracteres-especiales)
+- [17. Auditoría de Seguridad y Hardening](#17-auditoría-de-seguridad-y-hardening)
+  - [17.1. Metodología](#171-metodología)
+  - [17.2. Vulnerabilidades identificadas](#172-vulnerabilidades-identificadas)
+  - [17.3. Demostración del impacto](#173-demostración-del-impacto)
+  - [17.4. Correcciones aplicadas](#174-correcciones-aplicadas)
+  - [17.5. Verificación post-hardening](#175-verificación-post-hardening)
+  - [17.6. Superficie de ataque residual](#176-superficie-de-ataque-residual)
+- [18. Licencia](#18-licencia)
 
 ---
 
@@ -84,9 +94,10 @@ El sistema se organiza en tres niveles:
 | **Prometheus** | Base de datos de series temporales (métricas de hardware) |
 | **Node Exporter** | Telemetría del sistema operativo (CPU, RAM, temperatura) |
 | **Grafana** | Visualización de métricas históricas |
-| **Redis** | Caché de flujos para ntopng |
+| **Redis** | Caché de flujos para ntopng (autenticado) |
 | **Nginx** | Proxy inverso con cifrado TLS |
 | **WireGuard** | VPN para acceso remoto seguro |
+| **Docker Socket Proxy** | Proxy restrictivo sobre el socket de Docker |
 | **SQLite** | Persistencia histórica de eventos de red y alertas |
 
 ---
@@ -134,6 +145,7 @@ PIHOLE_PASSWORD=tu_contraseña_segura
 GRAFANA_PASSWORD=tu_contraseña_segura
 NTOPNG_USER=admin
 NTOPNG_PASSWORD=tu_contraseña_segura
+REDIS_PASSWORD=tu_contraseña_sin_caracteres_especiales
 DASHBOARD_USER=admin
 DASHBOARD_PASSWORD=tu_contraseña_segura
 FLASK_SECRET_KEY=cadena_larga_y_aleatoria
@@ -145,7 +157,9 @@ TELEGRAM_CHAT_ID=tu_chat_id
 
 > Todas las credenciales se gestionan exclusivamente mediante variables de entorno. El archivo `.env` nunca se sube al repositorio.
 
-> ⚠️ **Importante:** el servicio `mi_dashboard` lee las variables directamente del `.env` mediante `env_file`. Si añades variables nuevas al `.env`, reinicia el contenedor con `docker compose restart mi_dashboard` para que las cargue.
+> ⚠️ **Importante:** evita usar caracteres especiales como `!` en `REDIS_PASSWORD` — pueden causar problemas de interpretación en bash al pasarse como argumento al proceso de Redis dentro del contenedor.
+
+> ⚠️ El servicio `mi_dashboard` lee las variables directamente del `.env` mediante `env_file`. Si añades variables nuevas al `.env`, reinicia el contenedor con `docker compose restart mi_dashboard` para que las cargue.
 
 ### 5.3. Inicialización del Entorno Multi-Contenedor
 
@@ -160,22 +174,25 @@ docker compose up -d
 docker ps
 ```
 
-Deberías ver los siguientes contenedores en estado `Up`:
-`pihole`, `ntopng`, `redis-ntopng`, `tshark-sflow`, `prometheus`, `node-exporter`, `pihole-exporter`, `grafana`, `nginx-siem`, `wireguard`, `mi_dashboard`
+Deberías ver los siguientes **12 contenedores** en estado `Up`:
+`pihole`, `ntopng`, `redis-ntopng`, `tshark-sflow`, `prometheus`, `node-exporter`, `pihole-exporter`, `grafana`, `nginx-siem`, `wireguard`, `docker-proxy`, `mi_dashboard`
 
 ---
 
 ## 6. Matriz de Acceso al Sistema
 
-| Servicio | URL | Puerto |
-|---|---|---|
-| Dashboard Flask (SIEM) | `https://IP_RASPBERRY` | 443 (via Nginx) |
-| Pi-hole | `http://IP_RASPBERRY:80` | 80 |
-| Grafana | `http://IP_RASPBERRY:3000` | 3000 |
-| ntopng | `http://IP_RASPBERRY:3001` | 3001 |
-| Prometheus | `http://IP_RASPBERRY:9090` | 9090 |
+| Servicio | URL | Puerto | Acceso |
+|---|---|---|---|
+| Dashboard Flask (SIEM) | `https://IP_RASPBERRY` | 443 (via Nginx) | Red local + VPN |
+| Pi-hole | `http://IP_RASPBERRY:80` | 80 | Red local |
+| Grafana | `http://IP_RASPBERRY:3000` | 3000 | Red local |
+| ntopng | `http://IP_RASPBERRY:3001` | 3001 | Red local (login requerido) |
+| Prometheus | Solo interno | 127.0.0.1:9090 | Localhost únicamente |
+| Node Exporter | Solo interno | 127.0.0.1:9100 | Localhost únicamente |
+| pihole-exporter | Solo interno | 127.0.0.1:9167 | Localhost únicamente |
+| WireGuard VPN | UDP | 51820 | Acceso remoto externo |
 
-> El dashboard principal es accesible también desde fuera de la red local mediante la VPN WireGuard en el puerto UDP 51820.
+> Los servicios de telemetría (Prometheus, Node Exporter, pihole-exporter) están restringidos a localhost y no son accesibles desde la red local. Esto es intencional por seguridad — ver sección 17.
 
 ---
 
@@ -212,30 +229,31 @@ Base de bloqueo activa: **más de 600.000 dominios**.
 ---
 
 ## 9. Estructura del Repositorio
-
-```
+```bash
 TFG_deCastro-Ander/
 ├── pihole/                  # Configuración de todos los servicios Docker
-│   ├── docker-compose.yml   # Orquestación de los 11 microservicios
+│   ├── docker-compose.yml   # Orquestación de los 12 microservicios
 │   ├── .env.example         # Plantilla de variables de entorno
 │   ├── nginx/               # Configuración de Nginx y certificados TLS
-│   └── ...
+│   └── prometheus.yml       # Configuración de scraping de Prometheus
 ├── dashboard/               # Código fuente del dashboard Flask
 │   ├── app.py               # Backend principal (API, alertas, logging)
 │   └── templates/           # Plantillas HTML (index, sniffer, graficas, alertas, lateral, contenedores)
 └── wireguard_config/        # Configuración de WireGuard (claves excluidas)
 ```
-
 ---
 
 ## 10. Buenas Prácticas de Ciberseguridad Aplicadas
 
 - Las credenciales **nunca se almacenan en el repositorio**. Se gestionan mediante variables de entorno en el archivo `.env` (excluido del control de versiones).
-- Todas las variables sensibles están centralizadas en `.env`: contraseñas de Pi-hole, Grafana, ntopng, dashboard Flask y clave de sesión.
+- Todas las variables sensibles están centralizadas en `.env`: contraseñas de Pi-hole, Grafana, ntopng, Redis, dashboard Flask y clave de sesión.
 - El acceso al dashboard viaja siempre cifrado mediante TLS (Nginx).
 - El acceso remoto se realiza exclusivamente a través de la VPN WireGuard.
 - Las claves privadas de WireGuard y los certificados TLS están excluidos del repositorio mediante `.gitignore`.
 - El historial de git ha sido limpiado con BFG Repo Cleaner para garantizar que ninguna credencial queda en commits anteriores.
+- Los servicios de telemetría interna (Prometheus, Node Exporter, pihole-exporter, Redis) están restringidos a `localhost` y no son accesibles desde la red local.
+- El socket de Docker está protegido mediante un proxy restrictivo (`tecnativa/docker-socket-proxy`) que limita las operaciones permitidas.
+- ntopng requiere autenticación — el flag `--disable-login` está desactivado.
 - Las notificaciones externas (Telegram) se configuran opcionalmente mediante variables de entorno; el sistema funciona sin ellas.
 
 ---
@@ -284,7 +302,7 @@ ssh pi@raspberrypi.local
 ```
 La contraseña por defecto es `raspberry`. Cámbiala cuando te lo pida.
 
-> Si no funciona, prueba con la IP de tu Raspberry Pi en lugar de `raspberrypi.local`.  
+> Si no funciona, prueba con la IP de tu Raspberry Pi en lugar de `raspberrypi.local`.
 > Puedes verla en la pantalla de tu router (suele ser algo como `192.168.1.X`).
 
 ### 12.3. Paso 3: Instalación Automatizada del Motor Docker
@@ -327,7 +345,7 @@ Espera 1-2 minutos y comprueba que todo funciona:
 docker ps
 ```
 
-Deberías ver 11 contenedores en estado **Up**. Si alguno aparece como **Exited**, consulta la sección [Resolución de problemas](#13-resolución-de-problemas-frecuentes-faq).
+Deberías ver 12 contenedores en estado **Up**. Si alguno aparece como **Exited**, consulta la sección [Resolución de problemas](#13-resolución-de-problemas-frecuentes-faq).
 
 ### 12.6. Paso 6: Configurar el DNS en el Router Principal
 
@@ -345,7 +363,7 @@ Este es el paso más importante: decirle a tu red que use la Raspberry Pi como s
 
 Abre tu navegador y ve a: `https://IP_DE_TU_RASPBERRY`
 
-Acepta el aviso de certificado (es autofirmado, es normal).  
+Acepta el aviso de certificado (es autofirmado, es normal).
 Verás el panel de control con métricas en tiempo real.
 
 ---
@@ -356,18 +374,18 @@ Verás el panel de control con métricas en tiempo real.
 ```bash
 docker logs nombre_del_contenedor
 ```
-Esto muestra el error. Los más comunes están documentados en el Anexo III de la memoria del TFG.
+Esto muestra el error. Los más comunes están documentados en las secciones 16 y 17 de este README.
 
-**No puedo acceder al dashboard**  
+**No puedo acceder al dashboard**
 Comprueba que estás en la misma red Wi-Fi que la Raspberry Pi.
 
-**Pi-hole no bloquea nada**  
+**Pi-hole no bloquea nada**
 Verifica que el DNS de tu router apunta a la IP correcta de la Raspberry Pi (Paso 6).
 
-**Olvidé la contraseña del dashboard**  
+**Olvidé la contraseña del dashboard**
 Edita el archivo `.env`, cambia `DASHBOARD_PASSWORD` y reinicia con `docker compose restart mi_dashboard`.
 
-**El dashboard muestra "Credenciales incorrectas" aunque el `.env` es correcto**  
+**El dashboard muestra "Credenciales incorrectas" aunque el `.env` es correcto**
 El contenedor puede haber arrancado antes de leer el `.env`. Fuerza una recreación completa:
 ```bash
 docker compose down
@@ -378,7 +396,7 @@ Verifica que las variables llegaron al contenedor:
 docker exec mi_dashboard env | grep DASHBOARD
 ```
 
-**Grafana no arranca — error "permission denied" en `/var/lib/grafana`**  
+**Grafana no arranca — error "permission denied" en `/var/lib/grafana`**
 Los volúmenes de Grafana necesitan pertenecer al usuario interno de Grafana (UID 472):
 ```bash
 sudo chown -R 472:472 ~/TFG_deCastro-Ander/pihole/grafana_data
@@ -392,196 +410,80 @@ docker compose restart grafana
 ### 14.1. El problema: tráfico que el sistema no puede ver
 
 En la arquitectura actual, ntopng y tshark escuchan sobre la interfaz `wlan0` de la Raspberry Pi. Esto significa que el sistema **solo captura el tráfico que pasa directamente por la Raspberry**, no el tráfico que circula entre otros dispositivos de la red.
-
-```
+```bash
 INTERNET
-    │
-    ▼
+│
+▼
 ┌─────────────────┐
 │     ROUTER      │
 │   192.168.1.1   │
 └────────┬────────┘
-         │
-    ┌────┴────┐
-    │         │
- LAN eth     WiFi
-    │         │
-    └────┬────┘
-         ▼
+│
+┌────┴────┐
+│         │
+LAN eth     WiFi
+│         │
+└────┬────┘
+▼
 ┌─────────────────────────┐
 │      RASPBERRY PI       │
 │    ntopng · tshark      │
 │  (solo ve su tráfico    │
 │   y el WiFi de wlan0)   │
 └─────────────────────────┘
-
 ┌──────────┐   ✗ NO visible   ┌──────────────────┐
 │    PC    │ - - - - - - - -  │ Servidor interno  │
 └──────────┘                  └──────────────────┘
-               ↑
-    Este tráfico lateral no pasa
-    por la Raspberry → no se captura
+↑
+Este tráfico lateral no pasa
+por la Raspberry → no se captura
 ```
-
-- **Tráfico lateral (East-West):** comunicaciones entre dispositivos de la misma red (PC ↔ servidor, móvil ↔ impresora).
-- **Escaneo interno:** un dispositivo comprometido escaneando otros equipos de la red en busca de vulnerabilidades.
+- **Tráfico lateral (East-West):** comunicaciones entre dispositivos de la misma red.
+- **Escaneo interno:** un dispositivo comprometido escaneando otros equipos.
 - **Movimiento lateral de malware:** propagación de ransomware entre equipos internos.
-- **Transferencias entre dispositivos:** archivos enviados de un equipo a otro sin salir a internet.
 
 **¿Por qué es relevante para una PYME?**
-
-El movimiento lateral es la fase más crítica de un ataque de ransomware:
-
-```
 Fase 1 — Entrada via DNS malicioso   → ✅ Pi-hole lo bloquea
 Fase 2 — Contacto con servidor C2    → ✅ ntopng detecta el score
 Fase 3 — Movimiento lateral interno  → ⚠️  Detección parcial (ver sección 14.2)
 Fase 4 — Cifrado de archivos         → ❌ Demasiado tarde
-```
-
----
 
 ### 14.2. Detección de tráfico interno implementada
 
-El sistema incorpora una capa de detección de tráfico lateral basada en el análisis de las capturas de Tshark. Aunque sin port mirroring no se ve todo el tráfico East-West, el módulo **Red Interna** analiza cada 30 segundos las tramas capturadas buscando comunicaciones entre IPs internas (`192.168.x.x → 192.168.x.x`) que sí pasen por la Raspberry.
+El módulo **Red Interna** analiza cada 30 segundos las tramas capturadas buscando comunicaciones entre IPs internas que pasen por la Raspberry.
 
-**Qué detecta:**
-
-- Pares de dispositivos internos que se comunican entre sí
-- Mapa visual de conexiones internas actualizado en tiempo real
-- **Regla `LATERAL_SCAN`:** un dispositivo contacta más de 5 IPs internas distintas en 30 segundos → alerta ALTA. Más de 15 → alerta CRÍTICA. Patrón típico de ransomware en fase de reconocimiento.
-- **Regla `LATERAL_PORT`:** conexión interna a puerto crítico (RDP 3389, SMB 445, SSH 22, Telnet 23, VNC 5900) → alerta CRÍTICA. Estos protocolos son los vectores más habituales de movimiento lateral.
-
-**Dónde verlo:**
-
-Accede a la sección **Red Interna** del dashboard. Muestra el mapa de conexiones, el ranking de dispositivos por número de destinos contactados y el histórico de conexiones con filtro temporal (1h, 6h, 24h).
-
-**Limitación que persiste:**
-
-Esta detección solo cubre el tráfico que pasa físicamente por la Raspberry Pi. Las comunicaciones entre dos dispositivos que no involucren a la Raspberry siguen siendo invisibles sin las soluciones descritas en la sección 14.3.
-
----
+- **Regla `LATERAL_SCAN`:** un dispositivo contacta más de 5 IPs internas distintas en 30 segundos → alerta ALTA. Más de 15 → alerta CRÍTICA.
+- **Regla `LATERAL_PORT`:** conexión interna a puerto crítico (RDP 3389, SMB 445, SSH 22, Telnet 23, VNC 5900) → alerta CRÍTICA.
 
 ### 14.3. Soluciones para visibilidad total de red
 
 #### Opción 1 — Port Mirroring en el router
 
-Si tu router lo soporta, puedes configurarlo para que clone todo el tráfico y lo envíe a la Raspberry, sin modificar nada de la arquitectura de red.
+**Coste:** 0 € | **Dificultad:** Baja | **Requisito:** Router con soporte SPAN/Port Mirror
 
-**Coste:** 0 € (sin hardware adicional)  
-**Dificultad:** Baja  
-**Requisito:** Que el router soporte port mirroring (la mayoría de routers domésticos no lo tienen)
+#### Opción 2 — Raspberry Pi como gateway
 
-**Cómo comprobarlo:**
-1. Entra a la configuración de tu router: `http://192.168.1.1`
-2. Busca las opciones `Port Mirror`, `SPAN Port` o `Traffic Mirror`
-3. Si aparece, configura el puerto de destino como la IP de la Raspberry Pi
-
----
-
-#### Opción 2 — Raspberry Pi como gateway (visibilidad total)
-
-Se coloca la Raspberry Pi **entre el router y el resto de la red**. Todo el tráfico pasa físicamente por ella, lo que permite capturarlo completamente.
-
-```
-INTERNET → ROUTER → RASPBERRY PI → SWITCH → Dispositivos
-                        eth0    eth1
-                      (hacia   (hacia
-                      router)   LAN)
-                          ↑
-                   Todo el tráfico
-                    pasa por aquí
-```
-
-**Coste:** ~25 € (adaptador USB-Ethernet + switch básico)  
-**Dificultad:** Media  
-**Visibilidad:** Total — todo el tráfico de la red, incluyendo el lateral
-
-**Hardware necesario:**
-- **Adaptador USB-Ethernet** (~10 €): para tener una segunda interfaz de red en la Raspberry Pi.
-- **Switch básico** (~15 €): para conectar todos los dispositivos a la segunda interfaz.
-
-**Configuración paso a paso:**
+**Coste:** ~25 € | **Dificultad:** Media | **Visibilidad:** Total
 
 ```bash
-# 1. Identificar interfaces
-ip link show
-# eth0 → router (WAN) | eth1 → adaptador USB (LAN)
-
-# 2. Activar reenvío de paquetes
 echo 'net.ipv4.ip_forward=1' | sudo tee -a /etc/sysctl.conf
 sudo sysctl -p
-
-# 3. Configurar NAT
 sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 sudo iptables -A FORWARD -i eth1 -o eth0 -j ACCEPT
 sudo iptables -A FORWARD -i eth0 -o eth1 -m state --state RELATED,ESTABLISHED -j ACCEPT
 sudo apt install iptables-persistent -y
 sudo netfilter-persistent save
-
-# 4. Forzar DNS al Pi-hole
-sudo iptables -t nat -A PREROUTING -i eth1 -p udp --dport 53 -j DNAT --to-destination 192.168.1.X:53
-sudo iptables -t nat -A PREROUTING -i eth1 -p tcp --dport 53 -j DNAT --to-destination 192.168.1.X:53
 ```
-
-Modificar `docker-compose.yml` para escuchar en ambas interfaces:
-```yaml
-ntopng:
-  command: ntopng -i eth1 -i wlan0 -w 3001 --community --disable-login=1 -r 127.0.0.1
-
-tshark-sflow:
-  command: >
-    bash -c "apt-get update -qq && apt-get install -y -qq tshark &&
-    touch /logs/tshark_capture.txt && chmod 666 /logs/tshark_capture.txt &&
-    tshark -i eth1 -s 1600 -l >> /logs/tshark_capture.txt 2>&1"
-```
-
----
 
 #### Opción 3 — Switch gestionable con SPAN port (recomendada)
 
-Se añade un switch gestionable entre el router y los dispositivos. El switch clona todo el tráfico y lo envía a la Raspberry a través de un puerto espejo, sin modificar la arquitectura existente.
-
-```
-INTERNET → ROUTER → SWITCH GESTIONABLE → Dispositivos
-                          │
-                          │ Puerto espejo (SPAN)
-                          ▼
-                     RASPBERRY PI
-                   ntopng · tshark
-                  ven todo el tráfico
-```
-
-**Coste:** ~25-35 €  
-**Dificultad:** Baja — solo configuración web  
-**Visibilidad:** Total  
-**Ventaja:** No altera la topología de red
-
-**Switches compatibles recomendados:**
+**Coste:** ~25-35 € | **Dificultad:** Baja | **Visibilidad:** Total | **No altera la red**
 
 | Modelo | Precio aprox. | Puertos |
 |--------|--------------|---------|
 | TP-Link TL-SG105E | ~25 € | 5x GbE |
 | Netgear GS305E | ~30 € | 5x GbE |
 | TP-Link TL-SG108E | ~35 € | 8x GbE |
-
-**Configuración en TP-Link TL-SG105E:**
-1. Conecta el switch entre el router y los dispositivos.
-2. Conecta la Raspberry Pi al puerto 5 del switch.
-3. Accede a la interfaz web del switch.
-4. Ve a **Switching → Port Mirror** y configura:
-   - **Mirror Port (destino):** Puerto 5
-   - **Mirrored Ports (origen):** Puertos 1, 2, 3, 4
-   - **Mode:** Ingress + Egress
-5. Guarda. Desde ese momento ntopng y tshark ven todo el tráfico.
-
-```yaml
-# Ajuste en docker-compose.yml si el tráfico llega por eth0:
-ntopng:
-  command: ntopng -i eth0 -i wlan0 -w 3001 --community --disable-login=1 -r 127.0.0.1
-```
-
----
 
 ### 14.4. Comparativa de opciones
 
@@ -592,11 +494,7 @@ ntopng:
 | Switch gestionable (SPAN) | ~30 € | Baja | Total | No |
 | **Arquitectura actual** | **0 €** | **—** | **Parcial + detección activa** | **No** |
 
----
-
 ### 14.5. Estado actual del proyecto
-
-La arquitectura actual captura el tráfico que atraviesa la Raspberry Pi e incorpora detección activa de patrones de movimiento lateral sobre ese tráfico:
 
 - ✅ Filtrado DNS preventivo de más de 600.000 dominios maliciosos
 - ✅ Detección de comunicaciones con servidores C2 conocidos
@@ -604,34 +502,25 @@ La arquitectura actual captura el tráfico que atraviesa la Raspberry Pi e incor
 - ✅ Motor de alertas con clasificación de severidad (6 reglas)
 - ✅ Captura de paquetes HTTP/DNS en tiempo real
 - ✅ Detección de escaneos internos (`LATERAL_SCAN`) y conexiones a puertos críticos (`LATERAL_PORT`)
-- ✅ Mapa visual de conexiones internas en tiempo real (sección **Red Interna**)
-- ✅ Panel de gestión de contenedores Docker con logs y control de estado (sección **Contenedores**)
+- ✅ Mapa visual de conexiones internas en tiempo real
+- ✅ Panel de gestión de contenedores Docker con logs y control de estado
 - ✅ Notificaciones automáticas por Telegram para alertas CRÍTICA y ALTA
 - ✅ Exportación de alertas a CSV para análisis forense externo
 - ⚠️ Tráfico lateral entre dispositivos que no involucran a la Raspberry: requiere port mirroring (sección 14.3)
-
-La implementación de cualquiera de las opciones de la sección 14.3 eliminaría la limitación restante y convertiría el sistema en una solución de visibilidad total de red.
-
----
-
 
 ---
 
 ## 15. Acceso Externo: DuckDNS y Let's Encrypt
 
-Por defecto el dashboard usa un certificado TLS autofirmado, lo que hace que el navegador muestre un aviso de "conexión no segura". Esta sección describe cómo obtener un certificado válido y gratuito mediante Let's Encrypt, usando DuckDNS como dominio dinámico para la Raspberry Pi.
+Por defecto el dashboard usa un certificado TLS autofirmado. Esta sección describe cómo obtener un certificado válido y gratuito mediante Let's Encrypt usando DuckDNS.
 
-> **Resultado final:** acceso al dashboard en `https://tunombre.duckdns.org` con candado verde, sin avisos del navegador.
-
----
+> **Resultado final:** acceso en `https://tunombre.duckdns.org` con candado verde.
 
 ### 15.1. Crear dominio DuckDNS
 
-**1.** Ve a [duckdns.org](https://www.duckdns.org) e inicia sesión con Google o GitHub.
-
-**2.** En el campo "sub domain" escribe el nombre que quieras (ej: `siem-ander`) y pulsa **add domain**. Apunta el **token** que aparece en la parte superior.
-
-**3.** En la Raspberry, crea el script de actualización de IP:
+1. Ve a [duckdns.org](https://www.duckdns.org) e inicia sesión.
+2. Crea un subdominio y apunta el token.
+3. Crea el script de actualización:
 
 ```bash
 mkdir -p ~/duckdns
@@ -641,192 +530,103 @@ EOF
 chmod +x ~/duckdns/duck.sh
 ```
 
-Sustituye `TU_DOMINIO` por el nombre elegido (sin `.duckdns.org`) y `TU_TOKEN` por el token de la web.
-
-**4.** Comprueba que funciona:
-
+4. Automatiza con cron:
 ```bash
-~/duckdns/duck.sh
-cat ~/duckdns/duck.log  # Debe mostrar: OK
-```
-
-**5.** Automatiza con cron para que se actualice cada 5 minutos:
-
-```bash
-crontab -e
-# Añade al final:
 */5 * * * * ~/duckdns/duck.sh >/dev/null 2>&1
 ```
 
-**6.** Actualiza el `.env` con tu dominio:
-
-```env
-WIREGUARD_SERVERURL=tunombre.duckdns.org
-```
-
----
-
 ### 15.2. Instalar Certbot y obtener certificado
 
-Certbot es la herramienta oficial de Let's Encrypt. Usamos el plugin `standalone` que levanta un servidor temporal en el puerto 80 para validar el dominio.
-
-> ⚠️ **Antes de ejecutar:** asegúrate de que el puerto 80 de tu router está redirigido a la IP de la Raspberry Pi (NAT/Port Forwarding). Solo es necesario durante la obtención del certificado.
-
 ```bash
-# Instalar Certbot
-sudo apt update
-sudo apt install certbot -y
-
-# Detener Nginx temporalmente para liberar el puerto 80
+sudo apt update && sudo apt install certbot -y
 cd ~/TFG_deCastro-Ander/pihole
 docker compose stop nginx
-
-# Obtener el certificado
-sudo certbot certonly --standalone   --preferred-challenges http   -d tunombre.duckdns.org   --email tu@email.com   --agree-tos   --non-interactive
-
-# El certificado se guarda en:
-# /etc/letsencrypt/live/tunombre.duckdns.org/fullchain.pem
-# /etc/letsencrypt/live/tunombre.duckdns.org/privkey.pem
+sudo certbot certonly --standalone --preferred-challenges http \
+  -d tunombre.duckdns.org --email tu@email.com --agree-tos --non-interactive
 ```
-
----
 
 ### 15.3. Configurar Nginx con el certificado válido
 
-**1.** Copia los certificados al directorio de Nginx del proyecto:
-
 ```bash
-sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/fullchain.pem         ~/TFG_deCastro-Ander/pihole/nginx/certs/fullchain.pem
-sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/privkey.pem         ~/TFG_deCastro-Ander/pihole/nginx/certs/privkey.pem
+sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/fullchain.pem \
+  ~/TFG_deCastro-Ander/pihole/nginx/certs/fullchain.pem
+sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/privkey.pem \
+  ~/TFG_deCastro-Ander/pihole/nginx/certs/privkey.pem
 sudo chmod 644 ~/TFG_deCastro-Ander/pihole/nginx/certs/*.pem
+docker compose start nginx
 ```
 
-**2.** Actualiza la configuración de Nginx (`pihole/nginx/siem.conf`) para usar los nuevos certificados y tu dominio:
-
+Configuración `siem.conf`:
 ```nginx
 server {
     listen 80;
     server_name tunombre.duckdns.org;
     return 301 https://$host$request_uri;
 }
-
 server {
     listen 443 ssl;
     server_name tunombre.duckdns.org;
-
     ssl_certificate     /etc/nginx/certs/fullchain.pem;
     ssl_certificate_key /etc/nginx/certs/privkey.pem;
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_ciphers         HIGH:!aNULL:!MD5;
-
     location / {
-        proxy_pass         http://127.0.0.1:5000;
-        proxy_set_header   Host $host;
-        proxy_set_header   X-Real-IP $remote_addr;
-        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
     }
 }
 ```
 
-**3.** Reinicia Nginx:
-
-```bash
-docker compose start nginx
-```
-
-**4.** Abre `https://tunombre.duckdns.org` en el navegador — verás el candado verde sin ningún aviso.
-
----
-
 ### 15.4. Renovación automática
 
-Los certificados de Let's Encrypt caducan cada 90 días. Certbot instala automáticamente un timer de systemd que intenta la renovación dos veces al día — no necesitas configurar nada adicional para la renovación del certificado en sí.
-
-Sin embargo, después de renovar hay que copiar los nuevos certificados al directorio de Nginx. Añade esto al cron:
-
 ```bash
-crontab -e
-# Añade al final:
-0 3 * * 1 sudo certbot renew --quiet && sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/fullchain.pem ~/TFG_deCastro-Ander/pihole/nginx/certs/siem.crt && sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/privkey.pem ~/TFG_deCastro-Ander/pihole/nginx/certs/siem.key && docker restart nginx-siem
+0 3 * * 1 sudo certbot renew --quiet && \
+  sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/fullchain.pem \
+  ~/TFG_deCastro-Ander/pihole/nginx/certs/siem.crt && \
+  sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/privkey.pem \
+  ~/TFG_deCastro-Ander/pihole/nginx/certs/siem.key && \
+  docker restart nginx-siem
 ```
-
-Esto se ejecuta cada lunes a las 3:00 AM: renueva si toca, copia los nuevos certificados con los nombres correctos y reinicia Nginx.
-
----
-
-
----
 
 ---
 
 ## 16. Resolución de Incidencias del Despliegue Real
 
-Esta sección documenta los problemas encontrados durante el primer despliegue limpio desde el repositorio en una Raspberry Pi real, y sus soluciones. Es complementaria a la sección 13 (FAQ general).
-
----
-
 ### 16.1. Certificados TLS no encontrados
 
-**Síntoma:** Nginx no arranca. El log muestra:
-```
-cannot load certificate key "/etc/nginx/certs/siem.key": No such file or directory
-```
+**Síntoma:** Nginx no arranca — `cannot load certificate key "/etc/nginx/certs/siem.key": No such file or directory`
 
-**Causa:** Los certificados TLS autofirmados no están en el repositorio (están en `.gitignore` por seguridad). Al clonar el repo en una Raspberry nueva, el directorio `nginx/certs/` está vacío.
+**Causa:** Los certificados no están en el repositorio (excluidos por `.gitignore`).
 
-**Solución A — Copiar certificados de una instalación anterior:**
+**Solución — Generar certificados autofirmados nuevos:**
 ```bash
 mkdir -p ~/TFG_deCastro-Ander/pihole/nginx/certs
-sudo cp ~/tfg_red_backup/pihole/nginx/certs/siem.key ~/TFG_deCastro-Ander/pihole/nginx/certs/
-sudo cp ~/tfg_red_backup/pihole/nginx/certs/siem.crt ~/TFG_deCastro-Ander/pihole/nginx/certs/
-sudo chmod 644 ~/TFG_deCastro-Ander/pihole/nginx/certs/*
+openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+  -keyout ~/TFG_deCastro-Ander/pihole/nginx/certs/siem.key \
+  -out ~/TFG_deCastro-Ander/pihole/nginx/certs/siem.crt \
+  -subj "/CN=siem-dashboard/O=TFG/C=ES"
 docker restart nginx-siem
 ```
-
-**Solución B — Generar certificados autofirmados nuevos (instalación desde cero):**
-```bash
-mkdir -p ~/TFG_deCastro-Ander/pihole/nginx/certs
-openssl req -x509 -nodes -days 3650 -newkey rsa:2048   -keyout ~/TFG_deCastro-Ander/pihole/nginx/certs/siem.key   -out ~/TFG_deCastro-Ander/pihole/nginx/certs/siem.crt   -subj "/CN=siem-dashboard/O=TFG/C=ES"
-docker restart nginx-siem
-```
-
-> Para obtener un certificado válido (sin aviso del navegador) sigue la guía de la sección 15.
-
----
 
 ### 16.2. Credenciales del dashboard incorrectas
 
-**Síntoma:** El dashboard muestra "Credenciales incorrectas" aunque el `.env` tiene los valores correctos.
+**Síntoma:** "Credenciales incorrectas" aunque el `.env` es correcto.
 
-**Causa:** El contenedor `mi_dashboard` no recibe las variables de entorno si no se especifica `env_file` en el `docker-compose.yml`, o si arrancó antes de que se editara el `.env`.
-
-**Verificación:**
-```bash
-docker exec mi_dashboard env | grep -E "DASHBOARD|FLASK"
-```
-Si no devuelve nada o muestra valores vacíos, el contenedor no lee el `.env`.
+**Causa:** El contenedor arrancó antes de leer el `.env`.
 
 **Solución:**
 ```bash
-# Verificar que docker-compose.yml tiene env_file en el bloque dashboard:
-grep -A2 "env_file" ~/TFG_deCastro-Ander/pihole/docker-compose.yml
-
-# Recrear completamente
 docker compose down
 docker compose up -d --force-recreate
+docker exec mi_dashboard env | grep -E "DASHBOARD|FLASK"
 ```
-
----
 
 ### 16.3. Grafana no arranca por permisos
 
-**Síntoma:** Grafana aparece como "Detenido" en la página de Contenedores. El log muestra:
-```
-Error: ✗ failed to create directory "/var/lib/grafana/png": permission denied
-```
+**Síntoma:** `failed to create directory "/var/lib/grafana/png": permission denied`
 
-**Causa:** El directorio `grafana_data/` fue creado por root (Docker) y Grafana necesita escribir en él con su usuario interno (UID 472).
+**Causa:** El directorio `grafana_data/` necesita pertenecer al UID 472 (usuario interno de Grafana).
 
 **Solución:**
 ```bash
@@ -834,162 +634,185 @@ sudo chown -R 472:472 ~/TFG_deCastro-Ander/pihole/grafana_data
 docker compose restart grafana
 ```
 
-Accede a Grafana en `http://IP_RASPBERRY:3000` con usuario `admin` y la contraseña configurada en `GRAFANA_PASSWORD` del `.env`.
-
----
-
 ### 16.4. SSH — no resuelve raspberrypi.local
 
-**Síntoma:** Al intentar conectarse por SSH aparece:
-```
-ssh: Could not resolve hostname raspberrypi.local: Name or service not known
-```
+**Síntoma:** `ssh: Could not resolve hostname raspberrypi.local`
 
-**Causa:** En redes WiFi Mesh o con ciertos routers, la resolución mDNS de `raspberrypi.local` no funciona correctamente.
+**Causa:** La resolución mDNS no funciona en redes WiFi Mesh o con ciertos routers.
 
-**Solución:** Usa la IP directa de la Raspberry Pi. Encuéntrala en el panel de administración de tu router (`http://192.168.1.1`) en la sección de dispositivos conectados:
+**Solución:** Usa la IP directa visible en el panel de administración del router:
 ```bash
 ssh ander@192.168.1.X
 ```
 
-> El usuario por defecto de Raspberry Pi OS es `pi`, pero si creaste un usuario personalizado durante la instalación (como `ander`), usa ese.
+### 16.5. ntopng no conecta con Redis tras añadir contraseña
+
+**Síntoma:** ntopng muestra `ERROR: NOAUTH Authentication required` en bucle y no arranca.
+
+**Causa:** La sintaxis del parámetro `-r` de ntopng para incluir contraseña no es obvia. El formato correcto es `host:port:password@db`.
+
+**Solución:** Verificar la sintaxis exacta de tu versión:
+```bash
+docker exec ntopng ntopng --help 2>&1 | grep -A3 "\-r "
+```
+El comando correcto para conectar con Redis autenticado es:
+```yaml
+command: ntopng -i wlan0 -w 3001 --community -r 127.0.0.1:6379:${REDIS_PASSWORD}@0
+```
+
+### 16.6. Docker socket proxy — error 403 en panel de contenedores
+
+**Síntoma:** La pestaña Contenedores del dashboard devuelve error 500. Los logs del proxy muestran `403` en peticiones a `/images`.
+
+**Causa:** El proxy `tecnativa/docker-socket-proxy` bloquea el endpoint `/images` por defecto, pero el dashboard lo necesita para mostrar información de los contenedores.
+
+**Solución:** Añadir `IMAGES=1` a las variables de entorno del servicio `docker-proxy` en el `docker-compose.yml`:
+```yaml
+environment:
+  - CONTAINERS=1
+  - IMAGES=1
+  - START=1
+  - STOP=1
+  - RESTART=1
+  - LOGS=1
+  - INFO=1
+  - POST=1
+```
+
+### 16.7. Contraseña de Redis con caracteres especiales
+
+**Síntoma:** ntopng no conecta con Redis aunque la contraseña parece correcta. Al inspeccionar el contenedor con `docker inspect`, la contraseña aparece truncada o malformada.
+
+**Causa:** Caracteres especiales como `!`, `@`, `#` en la variable `REDIS_PASSWORD` se interpretan de forma especial por bash al expandirse dentro del `command` del `docker-compose.yml`.
+
+**Solución:** Usar únicamente caracteres alfanuméricos en `REDIS_PASSWORD`. Una contraseña larga sin símbolos especiales es igual de segura:
+```env
+REDIS_PASSWORD=MiContraseñaLargaSinSimbolos2024
+```
 
 ---
 
----
+## 17. Auditoría de Seguridad y Hardening
 
+### 17.1. Metodología
 
+Como parte del proceso de validación del sistema, se realizó una auditoría de seguridad ofensiva sobre el despliegue real, simulando el escenario de un atacante con acceso a la red local. El objetivo fue identificar vulnerabilidades antes de la entrega y aplicar las correcciones correspondientes.
 
-
-## 17. Licencia
-
-Proyecto académico desarrollado como Trabajo de Fin de Grado.
-
-## 18. Auditoría de Seguridad y Hardening
-
-### 18.1. Metodología
-
-Como parte del proceso de validación del sistema, se realizó una auditoría 
-de seguridad ofensiva sobre el despliegue real, simulando el escenario de un 
-atacante con acceso a la red local. El objetivo fue identificar vulnerabilidades 
-antes de la entrega y aplicar las correcciones correspondientes.
-
-### 18.2. Vulnerabilidades identificadas
+### 17.2. Vulnerabilidades identificadas
 
 | ID | Componente | Vulnerabilidad | Severidad |
 |----|-----------|---------------|-----------|
 | V1 | Prometheus | Puerto 9090 expuesto en red sin autenticación | Crítica |
 | V2 | Node Exporter | Puerto 9100 expuesto en red sin autenticación | Crítica |
-| V3 | Redis | Sin contraseña — acceso libre a datos de ntopng | Crítica |
-| V4 | ntopng | Flag `--disable-login=1` deshabilitaba autenticación | Crítica |
-| V5 | ntopng | Contraseña admin por defecto (`admin/admin`, hash MD5) | Crítica |
-| V6 | Dashboard Flask | Docker socket montado sin restricciones | Alta |
-| V7 | Grafana | `env_file` completo innecesariamente cargado | Media |
+| V3 | pihole-exporter | Puerto 9167 expuesto en red sin autenticación | Crítica |
+| V4 | Redis | Sin contraseña — acceso libre a todos los datos de ntopng | Crítica |
+| V5 | ntopng | Flag `--disable-login=1` deshabilitaba toda autenticación | Crítica |
+| V6 | ntopng | Contraseña admin por defecto sin cambiar (hash MD5) | Crítica |
+| V7 | Dashboard Flask | Docker socket montado directamente sin restricciones | Alta |
+| V8 | Grafana | `env_file` completo innecesariamente cargado | Media |
 
-### 18.3. Demostración del impacto
+### 17.3. Demostración del impacto
 
 Sin ninguna credencial, un atacante en la red local habría podido:
 
-1. **Reconocimiento** — Obtener sistema operativo, kernel y arquitectura 
-   del nodo vía Prometheus sin autenticación.
-2. **Extracción de credenciales** — Leer el hash MD5 de la contraseña 
-   admin de ntopng directamente desde Redis:
+1. **Reconocimiento** — Obtener sistema operativo, kernel y arquitectura del nodo vía Prometheus sin autenticación.
+2. **Extracción de credenciales** — Leer el hash de la contraseña admin de ntopng directamente desde Redis sin contraseña:
+```bash
+redis-cli get "ntopng.user.admin.password"
+→ [hash MD5 de la contraseña por defecto de ntopng]
 ```
-   redis-cli get "ntopng.user.admin.password"
-   → [hash MD5 de la contraseña por defecto de ntopng]
-```
-3. **Acceso a tráfico de red** — Acceder a ntopng y visualizar todos los 
-   flujos TCP/UDP de la red en tiempo real sin credenciales.
-4. **Mapeo de la red** — Obtener las IPs de todos los dispositivos 
-   conectados desde la caché DNS de Redis.
+3. **Acceso a tráfico de red** — Acceder a ntopng sin credenciales y visualizar todos los flujos TCP/UDP de la red en tiempo real.
+4. **Mapeo de la red** — Obtener las IPs de todos los dispositivos conectados desde la caché DNS de Redis.
 
-### 18.4. Correcciones aplicadas
+### 17.4. Correcciones aplicadas
 
-**V1 y V2 — Restricción de puertos a localhost**
+**V1, V2 y V3 — Restricción de puertos a localhost**
 
-Prometheus y Node Exporter modificados para escuchar únicamente en 
-`127.0.0.1`, eliminando su exposición a la red local:
+Prometheus, Node Exporter y pihole-exporter modificados para escuchar únicamente en `127.0.0.1`:
 
 ```yaml
 ports:
   - "127.0.0.1:9090:9090"
   - "127.0.0.1:9100:9100"
+  - "127.0.0.1:9167:9167"
 ```
 
-**V3 — Autenticación en Redis**
-
-Redis configurado con contraseña mediante variable de entorno:
+**V4 — Autenticación en Redis**
 
 ```yaml
 command: redis-server --requirepass ${REDIS_PASSWORD} --save "" --appendonly no
 ```
 
-**V4 — Activación del login en ntopng**
+**V5 — Activación del login en ntopng**
 
-Eliminado el flag `--disable-login=1`. Conexión a Redis actualizada 
-con la sintaxis correcta incluyendo contraseña:
+Eliminado `--disable-login=1`. Sintaxis correcta para Redis autenticado:
 
 ```yaml
 command: ntopng -i wlan0 -w 3001 --community -r 127.0.0.1:6379:${REDIS_PASSWORD}@0
 ```
 
-**V5 — Cambio de contraseña por defecto**
-
-Contraseña del usuario admin de ntopng actualizada desde Redis:
+**V6 — Cambio de contraseña por defecto de ntopng**
 
 ```bash
 docker exec -it redis-ntopng redis-cli -a ${REDIS_PASSWORD} \
   set "ntopng.user.admin.password" $(echo -n "NuevaPassword" | md5sum | cut -d' ' -f1)
 ```
 
-**V6 — Docker Socket Proxy**
+**V7 — Docker Socket Proxy**
 
-Sustituido el montaje directo del socket por un proxy restrictivo 
-(`tecnativa/docker-socket-proxy`) que expone únicamente las operaciones 
-necesarias para el panel de contenedores:
+Sustituido el montaje directo del socket por `tecnativa/docker-socket-proxy`:
 
 ```yaml
 docker-proxy:
   image: tecnativa/docker-socket-proxy
   environment:
     - CONTAINERS=1
+    - IMAGES=1
     - START=1
     - STOP=1
     - RESTART=1
     - LOGS=1
+    - INFO=1
+    - POST=1
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
 ```
 
 El dashboard se conecta al proxy en lugar del socket directamente:
-
 ```yaml
 environment:
   - DOCKER_HOST=tcp://127.0.0.1:2375
 ```
 
-**V7 — Limpieza de Grafana**
+**V8 — Limpieza de Grafana**
 
-Eliminado `env_file` innecesario del servicio Grafana, que cargaba 
-todas las variables del `.env` cuando solo necesita `GRAFANA_PASSWORD`.
+Eliminado `env_file` innecesario del servicio Grafana.
 
-### 18.5. Verificación post-hardening
+### 17.5. Verificación post-hardening
 
 Comprobación desde un equipo externo en la misma red local:
+curl http://IP_RASPBERRY:9090/-/healthy  → 000 (inaccesible) ✅
+curl http://IP_RASPBERRY:9100/metrics    → 000 (inaccesible) ✅
+curl http://IP_RASPBERRY:9167/metrics    → 000 (inaccesible) ✅
+curl http://IP_RASPBERRY:3001/           → 302 (login requerido) ✅
+redis-cli -h IP_RASPBERRY ping           → NOAUTH required ✅
 
-```bash
-curl http://192.168.1.147:9090/-/healthy  → 000 (inaccesible) ✅
-curl http://192.168.1.147:9100/metrics    → 000 (inaccesible) ✅
-curl http://192.168.1.147:3001/           → 000 (inaccesible) ✅
-redis-cli -h 192.168.1.147 ping          → NOAUTH required  ✅
-```
+### 17.6. Superficie de ataque residual
 
-### 18.6. Superficie de ataque residual
+Tras el hardening, los únicos servicios accesibles desde la red local son:
 
-Tras el hardening, la superficie de ataque restante se limita a:
+| Puerto | Servicio | Protección |
+|--------|---------|-----------|
+| 443 | Dashboard Flask (Nginx + TLS) | Autenticación + cifrado |
+| 80 | Pi-hole admin | Autenticación |
+| 3000 | Grafana | Autenticación |
+| 3001 | ntopng | Autenticación |
+| 51820/UDP | WireGuard VPN | Criptografía de clave pública |
 
-- **Puerto 443** — Dashboard Flask tras Nginx con TLS (autenticación requerida)
-- **Puerto 80** — Pi-hole admin (autenticación requerida)
-- **Puerto 3000** — Grafana (autenticación requerida)
-- **Puerto 51820/UDP** — WireGuard VPN (criptografía de clave pública)
+Todos los servicios de telemetría interna quedaron inaccesibles desde la red tras el hardening.
 
-Todos los servicios de monitorización internos (Prometheus, Node Exporter, 
-Redis) quedaron inaccesibles desde la red local tras el hardening.
+---
+
+## 18. Licencia
+
+Proyecto académico desarrollado como Trabajo de Fin de Grado.
