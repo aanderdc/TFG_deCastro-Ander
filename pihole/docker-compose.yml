@@ -53,6 +53,8 @@ services:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+    env_file:
+      - .env
     volumes:
       - ./grafana_data:/var/lib/grafana
     restart: unless-stopped
@@ -111,6 +113,8 @@ services:
     container_name: mi_dashboard
     network_mode: "host"
     restart: unless-stopped
+    env_file:
+      - .env
     volumes:
       - ../dashboard:/app
       - ./tshark_logs:/tshark_logs
