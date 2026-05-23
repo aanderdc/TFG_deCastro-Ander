@@ -894,8 +894,10 @@ Sin ninguna credencial, un atacante en la red local habría podido:
    del nodo vía Prometheus sin autenticación.
 2. **Extracción de credenciales** — Leer el hash MD5 de la contraseña 
    admin de ntopng directamente desde Redis:
-redis-cli get "ntopng.user.admin.password"
-→ 21232f297a57a5a743894a0e4a801fc3  (MD5 de "admin")
+```
+   redis-cli get "ntopng.user.admin.password"
+   → [hash MD5 de la contraseña por defecto de ntopng]
+```
 3. **Acceso a tráfico de red** — Acceder a ntopng y visualizar todos los 
    flujos TCP/UDP de la red en tiempo real sin credenciales.
 4. **Mapeo de la red** — Obtener las IPs de todos los dispositivos 
