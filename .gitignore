@@ -29,3 +29,4 @@ wireguard_config/peer1/
 wireguard_config/peer2/
 wireguard_config/peer3/
 wireguard_config/server/
+pihole/etc-pihole/cli_pw
