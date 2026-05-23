@@ -861,4 +861,4 @@ ssh ander@192.168.1.X
 
 ## 17. Licencia
 
-Proyecto académico desarrollado como Trabajo de Fin de Grado.
+Proyecto académico desarrollado como Trabajo de Fin de Grado para la EHU, Escuela de Ingeniería de Bilbao.
