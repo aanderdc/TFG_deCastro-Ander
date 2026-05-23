@@ -864,3 +864,130 @@ ssh ander@192.168.1.X
 ## 17. Licencia
 
 Proyecto académico desarrollado como Trabajo de Fin de Grado.
+
+## 18. Auditoría de Seguridad y Hardening
+
+### 18.1. Metodología
+
+Como parte del proceso de validación del sistema, se realizó una auditoría 
+de seguridad ofensiva sobre el despliegue real, simulando el escenario de un 
+atacante con acceso a la red local. El objetivo fue identificar vulnerabilidades 
+antes de la entrega y aplicar las correcciones correspondientes.
+
+### 18.2. Vulnerabilidades identificadas
+
+| ID | Componente | Vulnerabilidad | Severidad |
+|----|-----------|---------------|-----------|
+| V1 | Prometheus | Puerto 9090 expuesto en red sin autenticación | Crítica |
+| V2 | Node Exporter | Puerto 9100 expuesto en red sin autenticación | Crítica |
+| V3 | Redis | Sin contraseña — acceso libre a datos de ntopng | Crítica |
+| V4 | ntopng | Flag `--disable-login=1` deshabilitaba autenticación | Crítica |
+| V5 | ntopng | Contraseña admin por defecto (`admin/admin`, hash MD5) | Crítica |
+| V6 | Dashboard Flask | Docker socket montado sin restricciones | Alta |
+| V7 | Grafana | `env_file` completo innecesariamente cargado | Media |
+
+### 18.3. Demostración del impacto
+
+Sin ninguna credencial, un atacante en la red local habría podido:
+
+1. **Reconocimiento** — Obtener sistema operativo, kernel y arquitectura 
+   del nodo vía Prometheus sin autenticación.
+2. **Extracción de credenciales** — Leer el hash MD5 de la contraseña 
+   admin de ntopng directamente desde Redis:
+redis-cli get "ntopng.user.admin.password"
+→ 21232f297a57a5a743894a0e4a801fc3  (MD5 de "admin")
+3. **Acceso a tráfico de red** — Acceder a ntopng y visualizar todos los 
+   flujos TCP/UDP de la red en tiempo real sin credenciales.
+4. **Mapeo de la red** — Obtener las IPs de todos los dispositivos 
+   conectados desde la caché DNS de Redis.
+
+### 18.4. Correcciones aplicadas
+
+**V1 y V2 — Restricción de puertos a localhost**
+
+Prometheus y Node Exporter modificados para escuchar únicamente en 
+`127.0.0.1`, eliminando su exposición a la red local:
+
+```yaml
+ports:
+  - "127.0.0.1:9090:9090"
+  - "127.0.0.1:9100:9100"
+```
+
+**V3 — Autenticación en Redis**
+
+Redis configurado con contraseña mediante variable de entorno:
+
+```yaml
+command: redis-server --requirepass ${REDIS_PASSWORD} --save "" --appendonly no
+```
+
+**V4 — Activación del login en ntopng**
+
+Eliminado el flag `--disable-login=1`. Conexión a Redis actualizada 
+con la sintaxis correcta incluyendo contraseña:
+
+```yaml
+command: ntopng -i wlan0 -w 3001 --community -r 127.0.0.1:6379:${REDIS_PASSWORD}@0
+```
+
+**V5 — Cambio de contraseña por defecto**
+
+Contraseña del usuario admin de ntopng actualizada desde Redis:
+
+```bash
+docker exec -it redis-ntopng redis-cli -a ${REDIS_PASSWORD} \
+  set "ntopng.user.admin.password" $(echo -n "NuevaPassword" | md5sum | cut -d' ' -f1)
+```
+
+**V6 — Docker Socket Proxy**
+
+Sustituido el montaje directo del socket por un proxy restrictivo 
+(`tecnativa/docker-socket-proxy`) que expone únicamente las operaciones 
+necesarias para el panel de contenedores:
+
+```yaml
+docker-proxy:
+  image: tecnativa/docker-socket-proxy
+  environment:
+    - CONTAINERS=1
+    - START=1
+    - STOP=1
+    - RESTART=1
+    - LOGS=1
+```
+
+El dashboard se conecta al proxy en lugar del socket directamente:
+
+```yaml
+environment:
+  - DOCKER_HOST=tcp://127.0.0.1:2375
+```
+
+**V7 — Limpieza de Grafana**
+
+Eliminado `env_file` innecesario del servicio Grafana, que cargaba 
+todas las variables del `.env` cuando solo necesita `GRAFANA_PASSWORD`.
+
+### 18.5. Verificación post-hardening
+
+Comprobación desde un equipo externo en la misma red local:
+
+```bash
+curl http://192.168.1.147:9090/-/healthy  → 000 (inaccesible) ✅
+curl http://192.168.1.147:9100/metrics    → 000 (inaccesible) ✅
+curl http://192.168.1.147:3001/           → 000 (inaccesible) ✅
+redis-cli -h 192.168.1.147 ping          → NOAUTH required  ✅
+```
+
+### 18.6. Superficie de ataque residual
+
+Tras el hardening, la superficie de ataque restante se limita a:
+
+- **Puerto 443** — Dashboard Flask tras Nginx con TLS (autenticación requerida)
+- **Puerto 80** — Pi-hole admin (autenticación requerida)
+- **Puerto 3000** — Grafana (autenticación requerida)
+- **Puerto 51820/UDP** — WireGuard VPN (criptografía de clave pública)
+
+Todos los servicios de monitorización internos (Prometheus, Node Exporter, 
+Redis) quedaron inaccesibles desde la red local tras el hardening.
