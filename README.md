@@ -224,7 +224,7 @@ El sistema utiliza dos listas combinadas:
 - **Hagezi Multi Pro** — telemetría, rastreadores, malware y dominios C2
 - **StevenBlack/hosts** — publicidad masiva
 
-Base de bloqueo activa: **más de 600.000 dominios**.
+Base de bloqueo activa: 
 
 ---
 
