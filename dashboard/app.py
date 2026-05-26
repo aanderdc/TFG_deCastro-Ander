@@ -70,6 +70,14 @@ def init_db():
                        protocolo TEXT,
                        puerto_dst TEXT,
                        info TEXT)''')
+    # Índices para evitar full table scans con datos históricos
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_trafico_ip ON trafico_dispositivos(ip)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_trafico_fecha ON trafico_dispositivos(fecha_hora)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_lateral_src ON lateral_connections(src_ip, fecha)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_alertas_fecha ON alertas(fecha)')
+    
+    # WAL mode: mejora la concurrencia entre escrituras y lecturas
+    conn.execute('PRAGMA journal_mode=WAL')
     conn.commit()
     conn.close()
 
@@ -346,29 +354,16 @@ def get_ntopng_hosts():
 
 # --- DETECCIÓN DE TRÁFICO LATERAL ---
 # Rastrea la última línea procesada para no reprocesar todo el log cada ciclo
-_tshark_last_line = 0
+_tshark_last_pos = 0
 
 def analizar_trafico_lateral(cursor):
-    """
-    Parsea las líneas nuevas de tshark buscando pares src→dst donde AMBAS IPs
-    son internas (192.168.x.x). Eso es tráfico lateral que el sistema no captura
-    vía ntopng pero sí puede ver si alguno de los dispositivos se comunica con
-    la propia Raspberry (o si en el futuro se añade port mirroring).
-
-    También detecta patrones de escaneo: un mismo src contactando muchos dst
-    distintos en el mismo ciclo de 30s → alerta LATERAL_SCAN.
-    """
-    global _tshark_last_line
+    global _tshark_last_pos  # <-- AQUÍ, primera línea de la función
     try:
         with open(TSHARK_LOG_PATH, 'r', errors='replace') as f:
-            todas = f.readlines()
+            f.seek(_tshark_last_pos)
+            nuevas = f.readlines()
+            _tshark_last_pos = f.tell()
     except FileNotFoundError:
-        return
-
-    nuevas = todas[_tshark_last_line:]
-    _tshark_last_line = len(todas)
-
-    if not nuevas:
         return
 
     ahora = get_ahora_madrid()
