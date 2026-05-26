@@ -182,7 +182,7 @@ El sistema envía alertas automáticas por Telegram para eventos de severidad **
 2. Envía `/newbot`
 3. Elige un nombre y un username (ej: `TFG_Ander_bot`)
 4. BotFather te dará un **token** con este formato:
-8990953884:AAFNjgif9SYmM5VZn5RFQBZcNvt0J1b3RT4
+8990953884:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
    Guárdalo, lo necesitarás en el paso 3.
 
 ### Paso 2: Obtener tu Chat ID
