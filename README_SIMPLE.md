@@ -11,7 +11,7 @@ Este sistema vigila y protege toda tu red Wi-Fi de la empresa con una pequeña c
 - [¿QUÉ NECESITO?](#qué-necesito)
 - [PASO A PASO (7 pasos simples)](#guía-paso-a-paso)
 - [¿ALGO NO FUNCIONA?](#algo-no-funciona)
-- [Para técnicos: Documentación completa](#para-técnicos-documentación-completa)
+- [Para técnicos: Documentación completa](#README.md)
 
 ---
 
