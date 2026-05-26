@@ -11,7 +11,7 @@ Este sistema vigila y protege toda tu red Wi-Fi de la empresa con una pequeña c
 - [¿QUÉ NECESITO?](#qué-necesito)
 - [PASO A PASO (7 pasos simples)](#guía-paso-a-paso)
 - [¿ALGO NO FUNCIONA?](#algo-no-funciona)
-- [Para técnicos: Documentación completa](TFG_deCastro-Ander/README.md)
+- [Para técnicos: Documentación completa]([TFG_deCastro-Ander/README.md](https://github.com/aanderdc/TFG_deCastro-Ander/blob/main/README.md))
 
 ---
 
