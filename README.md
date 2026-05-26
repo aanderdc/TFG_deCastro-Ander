@@ -58,7 +58,7 @@ docker ps  # Deberías ver 12 contenedores activos
 Sistema de **monitorización y gestión de red** basado en **Raspberry Pi 4** y herramientas de código abierto, orientado a PYMES con presupuesto limitado.
 
 **Funciones principales:**
-- ✅ Filtrado DNS preventivo de **600.000+ dominios maliciosos**
+- ✅ Filtrado DNS preventivo de **dominios maliciosos**
 - ✅ Análisis de flujos TCP/UDP en tiempo real
 - ✅ Motor de alertas inteligente (6 reglas heurísticas)
 - ✅ Dashboard unificado con gráficas históricas
