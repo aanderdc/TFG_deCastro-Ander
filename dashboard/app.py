@@ -459,6 +459,11 @@ def background_logger():
                                     f"flows:{h['flows']} score:{h['score']}"))
                 conn.commit()
                 detectar_alertas(cursor, hosts)
+                # Limpieza automatica de datos antiguos (retencion 30 dias)
+                cursor.execute("DELETE FROM trafico_dispositivos WHERE fecha_hora < datetime('now', '-30 days')")
+                cursor.execute("DELETE FROM estadisticas_dns WHERE fecha < datetime('now', '-30 days')")
+                cursor.execute("DELETE FROM lateral_connections WHERE fecha < datetime('now', '-30 days')")
+                cursor.execute("DELETE FROM alertas WHERE fecha < datetime('now', '-90 days')")
                 conn.commit()
                 print(f"[{ahora}] ntopng OK — {len(hosts)} dispositivos guardados")
             else:
