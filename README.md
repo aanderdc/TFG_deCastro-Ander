@@ -172,6 +172,74 @@ docker ps
 
 ---
 
+## 📲 Configuración de Notificaciones Telegram
+
+El sistema envía alertas automáticas por Telegram para eventos de severidad **CRÍTICA** y **ALTA**.
+
+### Paso 1: Crear el bot con BotFather
+
+1. Abre Telegram y busca **@BotFather**
+2. Envía `/newbot`
+3. Elige un nombre y un username (ej: `TFG_Ander_bot`)
+4. BotFather te dará un **token** con este formato:
+8990953884:AAFNjgif9SYmM5VZn5RFQBZcNvt0J1b3RT4
+   Guárdalo, lo necesitarás en el paso 3.
+
+### Paso 2: Obtener tu Chat ID
+
+1. Busca tu bot en Telegram y envíale cualquier mensaje
+2. Ejecuta en la Raspberry:
+```bash
+   curl "https://api.telegram.org/botTU_TOKEN/getUpdates"
+```
+3. En el resultado busca el campo `"id"` dentro de `"chat"`. Ese es tu **chat_id**.
+
+### Paso 3: Configurar el .env
+
+```bash
+nano ~/TFG_deCastro-Ander/pihole/.env
+```
+
+Añade o edita estas dos líneas:
+```env
+TELEGRAM_TOKEN=tu_token_aqui
+TELEGRAM_CHAT_ID=tu_chat_id_aqui
+```
+
+### Paso 4: Reiniciar el dashboard
+
+```bash
+cd ~/TFG_deCastro-Ander/pihole
+docker compose restart dashboard
+```
+
+### Paso 5: Verificar
+
+```bash
+# Comprueba que las variables están cargadas
+docker exec mi_dashboard env | grep TELEGRAM
+
+# Test manual
+curl -X POST "https://api.telegram.org/botTU_TOKEN/sendMessage" \
+  -d chat_id=TU_CHAT_ID \
+  -d text="✅ SIEM — Bot configurado correctamente"
+```
+
+### Alertas que generan notificación
+
+| Regla | Severidad | Notifica |
+|-------|-----------|----------|
+| Threat Score > 500 | 🔴 CRÍTICA | ✅ |
+| LATERAL_PORT (RDP/SMB/SSH) | 🔴 CRÍTICA | ✅ |
+| Nueva IP detectada | 🟠 ALTA | ✅ |
+| Pico de tráfico 5x | 🟠 ALTA | ✅ |
+| LATERAL_SCAN ≥ 15 IPs | 🔴 CRÍTICA | ✅ |
+| Bloqueos DNS > 50 en 30s | 🟡 MEDIA | ❌ |
+
+> Las alertas de severidad MEDIA y BAJA solo se registran en el dashboard, no generan notificación Telegram.
+
+---
+
 ## 🎨 Funcionalidades del Dashboard
 
 ### Vistas Principales
@@ -231,7 +299,7 @@ docker ps
 - **Hagezi Multi Pro** — Telemetría, rastreadores, malware, C2
 - **StevenBlack/hosts** — Publicidad masiva
 
-**Base activa:** 600.000+ dominios bloqueados
+**Base activa:** dominios bloqueados
 
 ---
 
