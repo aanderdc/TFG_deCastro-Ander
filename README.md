@@ -56,7 +56,6 @@ docker ps  # Deberías ver 12 contenedores activos
 14. [Estructura del Repositorio](#-estructura-del-repositorio)
 15. [Eficiencia Energética](#-eficiencia-energética)
 16. [Buenas Prácticas](#-buenas-prácticas-aplicadas)
-17. [Cambios Recientes](#-cambios-recientes)
 
 ---
 
@@ -336,44 +335,60 @@ Acepta el aviso de certificado y ¡listo!
 
 ### Vistas Principales
 
-#### 1. 📊 Dashboard Principal
+#### 1. 📊 Dashboard Principal (`index.html`)
 - Métricas DNS en tiempo real
 - Dispositivos activos en la red
 - Consumo de ancho de banda por dispositivo
 - Alertas recientes con severidad
 - Estado de servicios críticos
+- **Gráficas interactivas** con Chart.js
+- **Diseño responsive** para móvil y escritorio
 
-#### 2. 📡 Sniffer (Captura en vivo)
+#### 2. 📡 Sniffer (`sniffer.html`) - Captura en vivo
 - Análisis de paquetes HTTP/DNS en tiempo real
 - Filtrado por texto (dominio, IP, puerto)
 - Detalles de cada transacción (headers, payload)
 - Exportación de capturas
 
-#### 3. 📈 Gráficas Históricas
-- Tráfico total (6h, 24h, 48h, 7 días)
+#### 3. 📊 Estadísticas Avanzadas (`estadisticas.html`)
+- Gráficas históricas de tráfico (6h, 24h, 48h, 7 días)
 - Consultas DNS bloqueadas
 - Tráfico por dispositivo
 - Selectores de rango temporal
 - Tendencias y picos de uso
+- **Filtrado avanzado** por severidad y tipo
 
-#### 4. ⚠️ Centro de Alertas
+#### 4. 📈 Gráficas Históricas (`graficas.html`)
+- Embedidas de Grafana
+- Visualización de series temporales
+- Dashboards personalizables
+
+#### 5. ⚠️ Centro de Alertas (`alertas.html`)
 - 6 reglas de detección automática
 - Clasificación por severidad (Crítica, Alta, Media, Baja)
 - Filtrado por tipo de alerta
 - Exportación a CSV
 - Notificaciones Telegram (CRÍTICA y ALTA)
+- **CSRF protection** en formularios
 
-#### 5. 🗺️ Red Interna
-- Mapa visual de conexiones entre dispositivos
+#### 6. 🗺️ Red Interna (`lateral.html` + `red.html`)
+- **lateral.html**: Mapa visual de conexiones entre dispositivos
+- **red.html**: Vista de red mejorada con topología visual
 - Detección de escaneos internos
 - Identificación de puertos críticos
 - Análisis de movimiento lateral
+- **Análisis de tráfico por dispositivo**
 
-#### 6. 🐳 Panel Docker
+#### 7. 🐳 Panel Docker (`contenedores.html`)
 - Estado de los 12 contenedores (UP/DOWN)
 - Logs en tiempo real de cada servicio
 - Botones: Iniciar/Parar/Reiniciar
 - Uptime y consumo de recursos (CPU, RAM)
+
+#### 8. 🔐 Página de Login (`login.html`)
+- Formulario seguro de autenticación
+- **CSRF protection** integrada
+- Sesiones cifradas
 
 ### 6 Reglas del Motor de Alertas
 
@@ -568,13 +583,18 @@ docker compose start nginx
 
 ### Correcciones Aplicadas
 
-- 🔒 Prometheus, Node Exporter, pihole-exporter restringidos a `localhost`
-- 🔒 Redis con autenticación obligatoria y contraseña fuerte
-- 🔒 ntopng con login requerido
-- 🔒 Docker Socket Proxy implementado con restricciones
-- 🔒 Sincronización de credenciales pre-startup
-- 🔒 TLS obligatorio en Nginx (HTTPS)
-- 🔒 CORS restringido a orígenes locales
+- 🔒 **Prometheus, Node Exporter, pihole-exporter** restringidos a `localhost`
+- 🔒 **Redis** con autenticación obligatoria y contraseña fuerte
+  - Comando: `redis-server --requirepass ${REDIS_PASSWORD}`
+  - Persistencia deshabilitada: `--save "" --appendonly no`
+- 🔒 **ntopng** con login requerido (sintaxis Redis: `127.0.0.1:6379:${REDIS_PASSWORD}@0`)
+- 🔒 **Docker Socket Proxy** implementado con restricciones (CONTAINERS, LOGS, INFO, POST, IMAGES)
+- 🔒 **Dashboard** con carga de credenciales via `env_file` centralizado
+- 🔒 **Tshark** con capabilities mejoradas (`NET_ADMIN`, `NET_RAW`)
+- 🔒 **WireGuard** con 3 peers preconfigurados
+- 🔒 **Sincronización de credenciales** pre-startup
+- 🔒 **TLS obligatorio** en Nginx (HTTPS)
+- 🔒 **CORS restringido** a orígenes locales
 
 ### Superficie de Ataque Residual (Post-hardening)
 
@@ -594,6 +614,19 @@ docker compose start nginx
 TFG_deCastro-Ander/
 ├── pihole/
 │   ├── docker-compose.yml          # Orquestación 12 microservicios
+│   │   ├── pihole                  # DNS filtering + admin panel
+│   │   ├── redis                   # Cache autenticado (contraseña requerida)
+│   │   ├── ntopng                  # Análisis flujos con login obligatorio
+│   │   ├── tshark-sflow            # Captura paquetes (NET_ADMIN/NET_RAW)
+│   │   ├── nginx                   # Proxy inverso + TLS
+│   │   ├── docker-proxy            # Socket proxy con permisos específicos
+│   │   ├── dashboard               # Flask + env_file centralizado
+│   │   ├── wireguard               # VPN remota (3 peers preconfigurados)
+│   │   ├── node-exporter           # Telemetría localhost (9100)
+│   │   ├── prometheus              # Métricas localhost (9090)
+│   │   ├── pihole-exporter         # Exportador localhost (9167)
+│   │   ├── grafana                 # Visualización históricas
+│   │   └── mitmproxy               # Servicio opcional (profiles)
 │   ├── .env.example                # Plantilla credenciales
 │   ├── prometheus.yml              # Scraping de métricas
 │   ├── nginx/
@@ -604,19 +637,47 @@ TFG_deCastro-Ander/
 │   ├── app.py                      # Backend Flask (API + alertas)
 │   ├── alerter.py                  # Motor de alertas (6 reglas)
 │   ├── templates/
-│   │   ├── index.html             # Dashboard principal
-│   │   ├── sniffer.html           # Captura en vivo
-│   │   ├── estadisticas.html      # Estadísticas avanzadas
-│   │   ├── graficas.html          # Históricas (Grafana embed)
-│   │   ├── alertas.html           # Centro de alertas
+│   │   ├── index.html             # Dashboard principal (gráficas interactivas)
+│   │   ├── sniffer.html           # Captura en vivo (filtrado avanzado)
+│   │   ├── estadisticas.html      # Análisis avanzado con gráficas históricas
+│   │   ├── graficas.html          # Embedidas de Grafana
+│   │   ├── alertas.html           # Centro de alertas (6 reglas, exportación CSV)
 │   │   ├── lateral.html           # Mapa red interna
-│   │   ├── red.html               # Vista de red mejorada
-│   │   ├── contenedores.html      # Panel Docker
-│   │   └── login.html             # Página de login
+│   │   ├── red.html               # Vista red mejorada (topología visual)
+│   │   ├── contenedores.html      # Panel Docker (logs en vivo)
+│   │   └── login.html             # Autenticación (CSRF protection)
 │   ├── static/                     # CSS, JS, assets
+│   │   ├── style.css              # Diseño responsive (móvil/escritorio)
+│   │   ├── chart.js               # Gráficas interactivas
+│   │   └── d3.js                  # Visualización avanzada
 │   └── requirements.txt            # Dependencias Python
 └── wireguard_config/               # Config WireGuard (excluida en .gitignore)
 ```
+
+### Mejoras en Docker Compose (v1.0)
+
+| Servicio | Actualización | Detalles |
+|----------|--------------|---------|
+| **redis** | ✅ Autenticación | Contraseña requerida + sin persistencia |
+| **ntopng** | ✅ Login requerido | Sintaxis Redis con contraseña |
+| **dashboard** | ✅ env_file | Carga centralizada de variables |
+| **docker-proxy** | ✅ Permisos | IMAGES=1 agregado para compatibilidad |
+| **exportadores** | ✅ Localhost | node-exporter (9100), prometheus (9090), pihole-exporter (9167) |
+| **tshark** | ✅ Capabilities | NET_ADMIN y NET_RAW para captura |
+| **wireguard** | ✅ Configuración | 3 peers preconfigurados |
+| **mitmproxy** | ✅ Opcional | Disponible con profiles: ["opcional"] |
+
+### Características del Dashboard (v1.0)
+
+| Feature | Descripción | Archivos |
+|---------|-------------|---------|
+| 📊 **Gráficas Interactivas** | Chart.js + D3.js | index.html, estadisticas.html |
+| 🔐 **CSRF Protection** | Seguridad en formularios | login.html, alertas.html |
+| 📱 **Responsive Design** | Móvil y escritorio | static/style.css |
+| 🌙 **Modo Oscuro** | Tema alternativo | static/style.css |
+| 📥 **Exportación** | CSV, JSON | alertas.html |
+| 🔔 **Notificaciones RT** | WebSocket | app.py |
+| 🎯 **Filtrado Avanzado** | Por severidad/tipo | alertas.html, estadisticas.html |
 
 ---
 
@@ -647,58 +708,8 @@ TFG_deCastro-Ander/
 - ✅ **Autenticación en ntopng** (login requerido, no --disable-login)
 - ✅ **Notificaciones opcionales** (Telegram, sin API keys en el repositorio)
 - ✅ **Documentación completa** (español, paso a paso)
-
----
-
-## 📦 Cambios Recientes
-
-### Docker Compose (v1.0 - Mayo 2026)
-
-#### Servicios Actualizados
-| Servicio | Cambio | Detalles |
-|----------|--------|---------|
-| **redis** | ✅ Autenticación obligatoria | Comando: `redis-server --requirepass ${REDIS_PASSWORD}` |
-| **ntopng** | ✅ Login requerido | Sintaxis Redis: `127.0.0.1:6379:${REDIS_PASSWORD}@0` |
-| **dashboard** | ✅ Variables de entorno via `env_file` | Carga de `.env` automática |
-| **docker-proxy** | ✅ Permisos completos | Agregado `IMAGES=1` para compatibilidad total |
-| **node-exporter** | ✅ Localhost binding | Puerto `127.0.0.1:9100` (sin exposición externa) |
-| **prometheus** | ✅ Localhost binding | Puerto `127.0.0.1:9090` (sin exposición externa) |
-| **pihole-exporter** | ✅ Localhost binding | Puerto `127.0.0.1:9167` (sin exposición externa) |
-| **tshark-sflow** | ✅ Captura mejorada | Agregado `cap_add` para NET_ADMIN/NET_RAW |
-| **wireguard** | ✅ Configuración segura | WireGuard con 3 peers preconfigurados |
-| **mitmproxy** | ✅ Servicio opcional | Disponible con `profiles: ["opcional"]` |
-
-#### Cambios de Seguridad
-- 🔒 **Redis**: Contraseña requerida, persistencia deshabilitada (`--save "" --appendonly no`)
-- 🔒 **Prometheus/Node Exporter**: Restringidos a localhost
-- 🔒 **ntopng**: Login obligatorio en lugar de `--disable-login=1`
-- 🔒 **Docker Socket Proxy**: Permisos específicos (CONTAINERS, LOGS, INFO, POST, IMAGES)
-
----
-
-### Plantillas HTML (v1.0 - Mayo 2026)
-
-#### Vistas del Dashboard
-| Archivo | Propósito | Características |
-|---------|-----------|-----------------|
-| **index.html** | Dashboard principal | Gráficas en tiempo real, dispositivos activos, alertas recientes |
-| **sniffer.html** | Captura de paquetes en vivo | Filtrado por dominio/IP/puerto, detalles de transacciones |
-| **estadisticas.html** | Análisis avanzado de tráfico | Gráficas históricas, tendencias, picos de uso |
-| **graficas.html** | Embedidas de Grafana | Visualización de series temporales |
-| **alertas.html** | Centro de alertas | 6 reglas de detección, clasificación por severidad, exportación CSV |
-| **lateral.html** | Mapa de red interna | Conexiones entre dispositivos, escaneos internos, análisis de movimiento lateral |
-| **red.html** | Vista de red mejorada | Topología visual, puertos críticos, análisis de tráfico por dispositivo |
-| **contenedores.html** | Panel de Docker | Estado de servicios, logs en vivo, botones de control (iniciar/parar/reiniciar) |
-| **login.html** | Página de autenticación | Formulario seguro con CSRF protection |
-
-#### Features Nuevos
-- 📊 **Gráficas interactivas** con Chart.js / D3.js
-- 🔐 **CSRF protection** en formularios
-- 📱 **Diseño responsive** para móvil y escritorio
-- 🌙 **Modo oscuro** (opcional)
-- 📥 **Exportación de datos** (CSV, JSON)
-- 🔔 **Notificaciones en tiempo real** (WebSocket)
-- 🎯 **Filtrado avanzado** de alertas por severidad y tipo
+- ✅ **Servicios opcionales** (Grafana, Prometheus, Mitmproxy con profiles)
+- ✅ **Persistencia securizada** (Redis sin datos, SQLite encriptado)
 
 ---
 
