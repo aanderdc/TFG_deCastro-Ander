@@ -5,25 +5,6 @@ Este sistema vigila y protege toda tu red Wi-Fi de la empresa con una pequeña c
 
 ---
 
-## 📋 Tabla de Contenidos (Para Principiantes)
-
-- [¿QUÉ ES ESTO?](#qué-es-esto) — Lee primero
-- [¿QUÉ NECESITO?](#qué-necesito)
-- [PASO A PASO (7 pasos simples)](#guía-paso-a-paso)
-- [¿ALGO NO FUNCIONA?](#algo-no-funciona)
-- [Para técnicos: Documentación completa](https://github.com/aanderdc/TFG_deCastro-Ander/blob/main/README.md)
-
----
-
-## ¿QUÉ ES ESTO?
-
-### 🎯 La idea en una frase
-Un "portero de seguridad inteligente" para tu red que:
-- **Bloquea** sitios web maliciosos antes de que tu ordenador intente entrar
-- **Vigila** todo lo que se descarga (cuántos MB, de dónde, cuándo)
-- **Avisa** si detecta comportamiento extraño (virus, hackeo, etc.)
-- **Controla** desde cualquier navegador con gráficos bonitos
-
 ### 📊 Comparación: Con vs Sin este sistema
 
 | Característica | Sin el sistema | Con el sistema |
@@ -359,29 +340,6 @@ Esto muestra el error. Ejemplos comunes:
 
 ---
 
-## 📊 ¿QUÉ VEO EN EL PANEL?
-
-### Pantalla principal (Dashboard)
-
-| Métrica | Qué significa | Ejemplo |
-|---|---|---|
-| **DNS Bloqueados** | Sitios maliciosos que hemos evitado | "2.543 bloqueados hoy" |
-| **Dispositivos activos** | Ordenadores/móviles conectados | "7 dispositivos" |
-| **Ancho de banda** | Cuánto se está descargando ahora | "2.5 MB/s bajada" |
-| **Alertas** 🔴 | Algo sospechoso | "Dispositivo nuevo detectado" |
-
-### Secciones principales
-
-| Sección | Para qué sirve | Acción típica |
-|---|---|---|
-| **Inicio** | Ver estadísticas en tiempo real | Revisar cada mañana |
-| **Gráficas** | Histórico de 24 horas, 7 días, etc. | Ver tendencias |
-| **Alertas** | Ver todas las cosas raras detectadas | Investigar si hay picos |
-| **Red Interna** | Ver qué dispositivos hablan entre sí | Detectar virus internos |
-| **Contenedores** | Estado técnico del sistema | Si algo falla |
-
----
-
 ## 🚨 ALERTAS: QUÉ SIGNIFICAN
 
 El sistema te avisará cuando vea algo raro:
@@ -481,28 +439,3 @@ Es muy difícil. Está protegido con autenticación y cifrado. Más seguro que u
 ### ❓ "¿Qué pasa con mi privacidad?"
 Los datos se guardan SOLO en tu Raspberry Pi. No se envía nada a internet (salvo si configuras Telegram).
 
----
-
-## 📄 Información Técnica
-
-Para usuarios avanzados o técnicos:
-
-- 📖 [Stack tecnológico completo](README.md#3-stack-tecnológico)
-- 🏗️ [Arquitectura del sistema](README.md#2-arquitectura-del-sistema)
-- 🔒 [Seguridad y hardening](README.md#17-auditoría-de-seguridad-y-hardening)
-- 🐛 [Troubleshooting avanzado](README.md#16-resolución-de-incidencias-del-despliegue-real)
-- ⚡ [Performance issues](README.md#performance-issues)
-
----
-
-## 📄 Licencia
-
-Proyecto académico. Uso libre para pequeñas empresas.
-
----
-
-## ✨ Créditos
-
-Proyecto TFG de Ander de Castro — 2026
-
-**¿Preguntas o sugerencias?** Abre un [issue en GitHub](https://github.com/aanderdc/TFG_deCastro-Ander/issues)
