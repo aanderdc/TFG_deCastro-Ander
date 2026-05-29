@@ -78,7 +78,7 @@ Insertar la tarjeta y encender el dispositivo.
 
 1. Apaga el router (paciencia 30 segundos)
 2. Inserta la tarjeta microSD en la Raspberry Pi (por debajo, hacia el lado)
-3. **Conecta con cable Ethernet** (¡esto es CRUCIAL!) a tu router
+3. **Conecta con cable Ethernet** a tu router o al WiFi
 4. Enchufa el cable USB-C a la corriente
 
 **¡La Raspberry Pi se enciende automáticamente!** ✨
