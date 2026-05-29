@@ -15,7 +15,7 @@
 - Cable Ethernet + ordenador para configuración inicial
 - Docker & Docker Compose preinstalados
 
-### En 5 pasos (si tienes experiencia técnica)
+### En 5 pasos
 
 ```bash
 # 1. Clonar y configurar
@@ -38,24 +38,19 @@ docker ps  # Deberías ver 12 contenedores activos
 
 ---
 
-## 📚 Tabla de Contenidos Completa
+## 📚 Tabla de Contenidos
 
 1. [Descripción del Proyecto](#-descripción-del-proyecto)
-2. [Arquitectura del Sistema](#-arquitectura)
+2. [Arquitectura](#-arquitectura)
 3. [Stack Tecnológico](#️-stack-tecnológico)
 4. [Instalación Rápida](#-instalación-rápida)
-5. [Guía de Usuario (sin experiencia)](#-guía-de-usuario)
-6. [Matriz de Acceso](#-matriz-de-acceso-al-sistema)
-7. [Funcionalidades](#-funcionalidades-del-dashboard)
-8. [Notificaciones Telegram](#-configuración-de-notificaciones-telegram)
-9. [Políticas de Seguridad](#-políticas-de-seguridad-dns-blocklists)
-10. [Solución de Problemas](#-solución-de-problemas-frecuentes)
-11. [Visibilidad de Red](#-visibilidad-de-red-limitaciones-y-soluciones)
-12. [Acceso Externo (DuckDNS + Let's Encrypt)](#-acceso-externo-duckdns--lets-encrypt)
-13. [Auditoría de Seguridad](#-auditoría-de-seguridad-y-hardening)
-14. [Estructura del Repositorio](#-estructura-del-repositorio)
-15. [Eficiencia Energética](#-eficiencia-energética)
-16. [Buenas Prácticas](#-buenas-prácticas-aplicadas)
+5. [Guía de Usuario](#-guía-de-usuario)
+6. [Funcionalidades](#-funcionalidades-del-dashboard)
+7. [Notificaciones Telegram](#-configuración-de-notificaciones-telegram)
+8. [Solución de Problemas](#-solución-de-problemas-frecuentes)
+9. [Acceso Externo](#-acceso-externo-duckdns--lets-encrypt)
+10. [Auditoría de Seguridad](#-auditoría-de-seguridad-y-hardening)
+11. [Estructura](#-estructura-del-repositorio)
 
 ---
 
@@ -73,10 +68,6 @@ Sistema de **monitorización y gestión de red** basado en **Raspberry Pi 4** y 
 - ✅ Notificaciones automáticas por Telegram
 - ✅ Acceso remoto seguro via VPN (WireGuard)
 - ✅ Certificados TLS con Let's Encrypt
-
-### Alineado con:
-- 🎓 ODS 4 (Educación de Calidad)
-- 🏭 ODS 9 (Industria, Innovación e Infraestructura)
 
 ---
 
@@ -101,7 +92,6 @@ INTERNET
 │    RASPBERRY PI 4 (Central)  │
 │  - Pi-hole (DNS Filtering)   │
 │  - ntopng (Análisis flujos)  │
-│  - Tshark (Captura paquetes) │
 │  - Dashboard Flask (SIEM)    │
 │  - Grafana (Históricas)      │
 │  - Prometheus (Métricas)     │
@@ -124,17 +114,14 @@ INTERNET
 | Servicio | Función | Puertos | Autenticación |
 |----------|---------|---------|---------------|
 | **Pi-hole** | Filtrado DNS preventivo | 53/UDP, 80/TCP | Contraseña |
-| **ntopng** | Análisis flujos TCP/UDP en tiempo real | 3001/TCP | ✅ Login requerido |
-| **Tshark** | Captura de paquetes | Interno | — |
-| **Flask (Dashboard)** | Dashboard web + motor de alertas | 5000 (interno) | ✅ Autenticación |
+| **ntopng** | Análisis flujos TCP/UDP | 3001/TCP | ✅ Login requerido |
+| **Flask** | Dashboard web + alertas | 5000 (interno) | ✅ Autenticación |
 | **Grafana** | Visualización históricas | 3000/TCP | ✅ Login requerido |
-| **Prometheus** | Métricas de hardware (series temporales) | 9090 (localhost) | 🔒 Localhost only |
-| **Node Exporter** | Telemetría SO (CPU, RAM, temp) | 9100 (localhost) | 🔒 Localhost only |
-| **Redis** | Caché de flujos (autenticado) | 6379 (interno) | ✅ Contraseña |
+| **Prometheus** | Métricas hardware | 9090 (localhost) | 🔒 Localhost only |
+| **Redis** | Caché de flujos | 6379 (interno) | ✅ Contraseña |
 | **Nginx** | Proxy inverso + TLS | 443/TCP, 80/TCP | ✅ TLS obligatorio |
 | **WireGuard** | VPN remota | 51820/UDP | ✅ Criptografía ECC |
-| **Docker Socket Proxy** | Acceso seguro a Docker API | 2375 (interno) | 🔒 Restringido |
-| **SQLite** | Persistencia de alertas | Interno | 🔒 Archivo |
+| **Docker Proxy** | Acceso seguro Docker API | 2375 (interno) | 🔒 Restringido |
 
 ---
 
@@ -142,18 +129,16 @@ INTERNET
 
 ### Requisitos Previos
 
-Si ya tienes Docker instalado, salta este paso.
-
 ```bash
 # Instalar Docker
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
 sudo usermod -aG docker $USER
 
-# Desconecta y vuelve a conectar SSH para aplicar cambios
+# Desconecta y vuelve a conectar SSH
 ```
 
-### Despliegue Completo
+### Despliegue
 
 ```bash
 # 1. Clonar repositorio
@@ -163,88 +148,62 @@ cd TFG_deCastro-Ander
 # 2. Configurar credenciales
 cp pihole/.env.example pihole/.env
 nano pihole/.env
-# 👉 Edita todos los valores marcados (contraseñas, IPs, etc.)
+# 👉 Edita todos los valores marcados
 
 # 3. Iniciar servicios
 cd pihole
 docker compose up -d
 
-# 4. Verificar que los 12 contenedores están UP
+# 4. Verificar
 docker ps
-# Esperado: dashboard, pi-hole, ntopng, grafana, prometheus, redis, nginx, wireguard, tshark, etc.
 
-# 5. Acceder al dashboard
-# Abre navegador: https://IP_DE_TU_RASPBERRY
-# Usuario: El definido en DASHBOARD_USER
-# Contraseña: El definido en DASHBOARD_PASSWORD
+# 5. Acceder
+# https://IP_DE_TU_RASPBERRY
 ```
 
 ---
 
-## 👥 Matriz de Acceso al Sistema
+## 👥 Matriz de Acceso
 
 | Servicio | URL | Credenciales | Acceso | Encriptación |
 |----------|-----|--------------|--------|--------------|
-| **Dashboard (SIEM)** | `https://IP` | `DASHBOARD_USER` / `DASHBOARD_PASSWORD` | Red local + VPN | ✅ TLS |
+| **Dashboard** | `https://IP` | `DASHBOARD_USER` / `DASHBOARD_PASSWORD` | Red local + VPN | ✅ TLS |
 | **Pi-hole** | `http://IP:80` | `PIHOLE_PASSWORD` | Red local | ❌ HTTP |
 | **Grafana** | `http://IP:3000` | `admin` / `GRAFANA_PASSWORD` | Red local | ❌ HTTP |
 | **ntopng** | `http://IP:3001` | `admin` / `NTOPNG_PASSWORD` | Red local | ❌ HTTP |
 | **WireGuard** | IP pública:51820/UDP | Certificados | Acceso remoto | ✅ ECC |
 
-> 🔒 **Prometheus, Node Exporter y pihole-exporter** están restringidos a `localhost` (inaccesibles desde la red local).
-
 ---
 
 ## 📲 Configuración de Notificaciones Telegram
 
-El sistema envía alertas automáticas por Telegram para eventos de severidad **CRÍTICA** y **ALTA**.
-
-### Paso 1: Crear el bot con BotFather
+### Paso 1: Crear el bot
 
 1. Abre Telegram y busca **@BotFather**
 2. Envía `/newbot`
-3. Elige un nombre y un username (ej: `TFG_Ander_bot`)
-4. BotFather te dará un **token**. Ejemplo: `8990953884:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
-5. Guárdalo, lo necesitarás en el Paso 3
+3. Elige un nombre y username
+4. Guarda el **token** que te proporciona
 
-### Paso 2: Obtener tu Chat ID
+### Paso 2: Obtener Chat ID
 
-1. Busca tu bot en Telegram y envíale cualquier mensaje
-2. Ejecuta en la Raspberry:
 ```bash
 curl "https://api.telegram.org/botTU_TOKEN/getUpdates"
 ```
-3. En el resultado busca el campo `"id"` dentro de `"chat"`. Ese es tu **chat_id**.
 
-### Paso 3: Configurar el .env
+Busca el campo `"id"` dentro de `"chat"`.
 
-```bash
-nano ~/TFG_deCastro-Ander/pihole/.env
-```
+### Paso 3: Configurar .env
 
-Añade o edita estas dos líneas:
 ```env
 TELEGRAM_TOKEN=tu_token_aqui
 TELEGRAM_CHAT_ID=tu_chat_id_aqui
 ```
 
-### Paso 4: Reiniciar el dashboard
+### Paso 4: Reiniciar
 
 ```bash
 cd ~/TFG_deCastro-Ander/pihole
 docker compose restart dashboard
-```
-
-### Paso 5: Verificar
-
-```bash
-# Comprueba que las variables están cargadas
-docker exec mi_dashboard env | grep TELEGRAM
-
-# Test manual
-curl -X POST "https://api.telegram.org/botTU_TOKEN/sendMessage" \
-  -d chat_id=TU_CHAT_ID \
-  -d text="✅ SIEM — Bot configurado correctamente"
 ```
 
 ### Alertas que generan notificación
@@ -256,46 +215,33 @@ curl -X POST "https://api.telegram.org/botTU_TOKEN/sendMessage" \
 | Nueva IP detectada | 🟠 ALTA | ✅ |
 | Pico de tráfico 5x | 🟠 ALTA | ✅ |
 | LATERAL_SCAN ≥ 15 IPs | 🔴 CRÍTICA | ✅ |
-| Bloqueos DNS > 50 en 30s | 🟡 MEDIA | ❌ |
-
-> Las alertas de severidad MEDIA y BAJA solo se registran en el dashboard, no generan notificación Telegram.
 
 ---
 
-## 👥 Guía de Usuario (Sin Experiencia Técnica)
+## 👥 Guía de Usuario
 
-### Paso 1: Flashear el Sistema Operativo
+### Paso 1: Flashear SO
 
 1. Descarga **[Raspberry Pi Imager](https://www.raspberrypi.com/software/)**
-2. Inserta la microSD en tu ordenador
-3. Selecciona:
-   - Dispositivo: **Raspberry Pi 4**
-   - SO: **Raspberry Pi OS (64-bit)**
-   - Almacenamiento: **tu microSD**
-4. Clic en **Escribir** y espera a que termine
-5. Inserta la microSD en Raspberry Pi + cable Ethernet + enchufa
+2. Inserta la microSD
+3. Selecciona: **Raspberry Pi 4** + **Raspberry Pi OS (64-bit)**
+4. Clic en **Escribir** y espera
 
-### Paso 2: Conexión Remota (SSH)
-
-**Windows:** Abre PowerShell  
-**Mac/Linux:** Abre Terminal
+### Paso 2: SSH
 
 ```bash
 ssh pi@raspberrypi.local
-# Contraseña: raspberry (cámbiala después)
+# Contraseña: raspberry
 ```
 
-> Si no funciona `raspberrypi.local`, usa la IP visible en tu router: `ssh pi@192.168.1.X`
-
-### Paso 3: Instalar Docker
+### Paso 3: Docker
 
 ```bash
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
 sudo usermod -aG docker $USER
+# Reconectar SSH
 ```
-
-Desconecta y vuelve a conectar SSH.
 
 ### Paso 4: Clonar y Configurar
 
@@ -304,30 +250,27 @@ git clone https://github.com/aanderdc/TFG_deCastro-Ander.git
 cd TFG_deCastro-Ander/pihole
 cp .env.example .env
 nano .env
-# 👉 Edita los campos (contraseñas, IPs, etc.)
-# Guardar: Ctrl+O → Enter → Ctrl+X
+# Editar campos (Ctrl+O → Enter → Ctrl+X)
 ```
 
-### Paso 5: Lanzar Servicios
+### Paso 5: Lanzar
 
 ```bash
 docker compose up -d
-docker ps  # Verifica que hay 12 contenedores UP
+docker ps  # Verificar 12 contenedores
 ```
 
-### Paso 6: Configurar DNS en el Router
+### Paso 6: DNS en Router
 
-1. Abre navegador → `192.168.1.1` (o dirección de tu router)
+1. Abre `192.168.1.1` en navegador
 2. Inicia sesión
 3. Busca **DHCP** o **DNS**
-4. Cambia **DNS primario** a la IP de tu Raspberry (ej: `192.168.1.100`)
-5. Guarda y reinicia router
+4. Cambia **DNS primario** a la IP de tu Raspberry
+5. Guarda y reinicia
 
-### Paso 7: Accede al Dashboard
+### Paso 7: Dashboard
 
-Abre: `https://IP_DE_TU_RASPBERRY`
-
-Acepta el aviso de certificado y ¡listo!
+Abre `https://IP_DE_TU_RASPBERRY` - Acepta el certificado
 
 ---
 
@@ -338,82 +281,63 @@ Acepta el aviso de certificado y ¡listo!
 #### 1. 📊 Dashboard Principal (`index.html`)
 - Métricas DNS en tiempo real
 - Dispositivos activos en la red
-- Consumo de ancho de banda por dispositivo
+- Consumo de ancho de banda
 - Alertas recientes con severidad
 - Estado de servicios críticos
-- **Gráficas interactivas** con Chart.js
-- **Diseño responsive** para móvil y escritorio
 
-#### 2. 📡 Sniffer (`sniffer.html`) - Captura en vivo
+#### 2. 📡 Sniffer (`sniffer.html`)
 - Análisis de paquetes HTTP/DNS en tiempo real
-- Filtrado por texto (dominio, IP, puerto)
-- Detalles de cada transacción (headers, payload)
-- Exportación de capturas
+- Filtrado por dominio, IP, puerto
+- Detalles de transacciones
 
-#### 3. 📊 Estadísticas Avanzadas (`estadisticas.html`)
-- Gráficas históricas de tráfico (6h, 24h, 48h, 7 días)
+#### 3. 📊 Estadísticas (`estadisticas.html`)
+- Gráficas históricas (6h, 24h, 48h, 7 días)
 - Consultas DNS bloqueadas
 - Tráfico por dispositivo
-- Selectores de rango temporal
-- Tendencias y picos de uso
-- **Filtrado avanzado** por severidad y tipo
 
-#### 4. 📈 Gráficas Históricas (`graficas.html`)
+#### 4. 📈 Gráficas (`graficas.html`)
 - Embedidas de Grafana
-- Visualización de series temporales
-- Dashboards personalizables
+- Series temporales
 
-#### 5. ⚠️ Centro de Alertas (`alertas.html`)
+#### 5. ⚠️ Alertas (`alertas.html`)
 - 6 reglas de detección automática
-- Clasificación por severidad (Crítica, Alta, Media, Baja)
-- Filtrado por tipo de alerta
+- Severidad: Crítica, Alta, Media, Baja
 - Exportación a CSV
-- Notificaciones Telegram (CRÍTICA y ALTA)
-- **CSRF protection** en formularios
 
-#### 6. 🗺️ Red Interna (`lateral.html` + `red.html`)
-- **lateral.html**: Mapa visual de conexiones entre dispositivos
-- **red.html**: Vista de red mejorada con topología visual
+#### 6. 🗺️ Red (`lateral.html` + `red.html`)
+- Mapa visual de conexiones
 - Detección de escaneos internos
-- Identificación de puertos críticos
 - Análisis de movimiento lateral
-- **Análisis de tráfico por dispositivo**
 
-#### 7. 🐳 Panel Docker (`contenedores.html`)
-- Estado de los 12 contenedores (UP/DOWN)
-- Logs en tiempo real de cada servicio
+#### 7. 🐳 Docker (`contenedores.html`)
+- Estado de los 12 contenedores
+- Logs en tiempo real
 - Botones: Iniciar/Parar/Reiniciar
-- Uptime y consumo de recursos (CPU, RAM)
-
-#### 8. 🔐 Página de Login (`login.html`)
-- Formulario seguro de autenticación
-- **CSRF protection** integrada
-- Sesiones cifradas
 
 ### 6 Reglas del Motor de Alertas
 
 | Regla | Condición | Severidad |
 |-------|-----------|-----------|
 | **Threat Score** | ntopng > 100 (crítico > 500) | CRÍTICA |
-| **Nueva IP** | Dispositivo no visto anteriormente | ALTA |
-| **Pico de tráfico** | 5x la media 24h | ALTA |
+| **Nueva IP** | Dispositivo no visto | ALTA |
+| **Pico tráfico** | 5x la media 24h | ALTA |
 | **Bloqueos DNS** | >50 dominios en 30s | MEDIA |
-| **LATERAL_SCAN** | >5 IPs internas en 30s | ALTA / CRÍTICA |
-| **LATERAL_PORT** | Conexión a RDP/SMB/SSH/Telnet/VNC | CRÍTICA |
+| **LATERAL_SCAN** | >5 IPs internas en 30s | ALTA |
+| **LATERAL_PORT** | Conexión RDP/SMB/SSH/Telnet/VNC | CRÍTICA |
 
 ---
 
-## 🔐 Políticas de Seguridad (DNS Blocklists)
+## 🔐 Políticas de Seguridad
 
-**Dos listas de bloqueo combinadas:**
-- **Hagezi Multi Pro** — Telemetría, rastreadores, malware, Command & Control (C2)
-- **StevenBlack/hosts** — Publicidad masiva y trackers
+**DNS Blocklists:**
+- **Hagezi Multi Pro** — Telemetría, rastreadores, malware, C2
+- **StevenBlack/hosts** — Publicidad y trackers
 
 **Base activa:** 250,000+ dominios bloqueados
 
 ---
 
-## ❌ Solución de Problemas Frecuentes
+## ❌ Solución de Problemas
 
 ### Contenedor aparece "Exited"
 ```bash
@@ -423,36 +347,12 @@ docker compose restart nombre_contenedor
 
 ### No puedo acceder al dashboard
 - ¿Estás en la misma red que la Raspberry?
-- ¿El navegador te muestra advertencia de certificado? (es normal, acepta)
-- Verifica la IP: `docker inspect nombre_contenedor | grep IPAddress`
+- ¿El navegador muestra advertencia de certificado? (normal, acepta)
 
 ### Pi-hole no bloquea nada
-Verifica que el DNS del router apunta a la IP correcta de la Raspberry.
 ```bash
-nslookup google.com 192.168.1.X  # Reemplaza X con la IP de tu Raspberry
+nslookup google.com 192.168.1.X
 ```
-
-### Olvidé la contraseña del dashboard
-```bash
-nano .env  # Edita DASHBOARD_PASSWORD
-docker compose restart dashboard
-```
-
-### "Credenciales incorrectas" aunque todo está bien
-```bash
-docker compose down
-docker compose up -d --force-recreate
-docker exec dashboard env | grep DASHBOARD
-```
-
-### Grafana no arranca — "permission denied"
-```bash
-sudo chown -R 472:472 ~/TFG_deCastro-Ander/pihole/grafana_data
-docker compose restart grafana
-```
-
-### SSH no resuelve `raspberrypi.local`
-Usa directamente la IP del router: `ssh pi@192.168.1.X`
 
 ### ntopng no conecta con Redis
 La sintaxis debe ser: `127.0.0.1:6379:${REDIS_PASSWORD}@0`
@@ -461,45 +361,32 @@ La sintaxis debe ser: `127.0.0.1:6379:${REDIS_PASSWORD}@0`
 Añade `IMAGES=1` a las variables de entorno del servicio `docker-proxy`.
 
 ### Contraseña Redis con caracteres especiales
-⚠️ **Usa solo alfanuméricos.** Caracteres como `!` `@` `#` se interpretan mal. Ejemplo:
-```env
-REDIS_PASSWORD=MiContraseñaLargaSinSimbolos2024
-```
-
-### El dashboard envía alertas duplicadas
-Borra el archivo de alertas y reinicia:
-```bash
-docker exec dashboard rm /app/alerts.db
-docker compose restart dashboard
-```
+⚠️ **Usa solo alfanuméricos.** Caracteres como `!` `@` `#` causan problemas.
 
 ---
 
-## 🌐 Visibilidad de Red: Limitaciones y Soluciones
+## 🌐 Visibilidad de Red
 
 ### El Problema
 
-ntopng y tshark capturan tráfico que **pasa por la Raspberry**. El tráfico lateral (PC ↔ Servidor interno) **no se ve**.
+ntopng y tshark capturan tráfico que **pasa por la Raspberry**. El tráfico lateral (PC ↔ Servidor) **no se ve**.
 
 ### Lo que SÍ detectamos
 - ✅ Entradas maliciosas (bloqueadas por Pi-hole)
 - ✅ Contacto con C2 (puntuación ntopng)
-- ✅ Escaneos internos (regla `LATERAL_SCAN`)
-- ✅ Conexiones a puertos críticos (regla `LATERAL_PORT`)
+- ✅ Escaneos internos (LATERAL_SCAN)
+- ✅ Conexiones a puertos críticos (LATERAL_PORT)
 
-### Lo que NO vemos
-- ❌ Movimiento lateral completo entre dispositivos internos
+### Soluciones
 
-### Soluciones disponibles
+| Opción | Coste | Dificultad | Visibilidad |
+|--------|-------|-----------|-------------|
+| **Port Mirroring (SPAN)** | 0 € | Baja | Total |
+| **Raspberry como gateway** | ~25 € | Media | Total |
+| **Switch gestionable** | ~30 € | Baja | Total |
+| **Arquitectura actual** | 0 € | — | Parcial |
 
-| Opción | Coste | Dificultad | Visibilidad | Afecta red |
-|--------|-------|-----------|-------------|-----------|
-| **Port Mirroring (SPAN) en router** | 0 € | Baja | Total | No |
-| **Raspberry como gateway** | ~25 € | Media | Total | Sí |
-| **Switch gestionable (SPAN)** | ~30 € | Baja | Total | No |
-| **Arquitectura actual** | 0 € | — | Parcial + detección | No |
-
-### Switch recomendado (SPAN a bajo coste)
+### Switches recomendados (SPAN)
 - TP-Link TL-SG105E (~25 €)
 - Netgear GS305E (~30 €)
 - TP-Link TL-SG108E (~35 €)
@@ -510,12 +397,7 @@ ntopng y tshark capturan tráfico que **pasa por la Raspberry**. El tráfico lat
 
 ### 1. Crear dominio DuckDNS
 
-```bash
-# Ve a https://www.duckdns.org
-# - Inicia sesión (con cuenta de GitHub/Google/Twitter)
-# - Crea un subdominio (ej: misistema)
-# - Nota el TOKEN
-```
+Ve a https://www.duckdns.org - Inicia sesión - Crea subdominio - Guarda TOKEN
 
 ### 2. Script de actualización DNS
 
@@ -529,7 +411,7 @@ chmod +x ~/duckdns/duck.sh
 
 # Automatizar cada 5 minutos
 crontab -e
-# Añade: */5 * * * * ~/duckdns/duck.sh >/dev/null 2>&1
+# */5 * * * * ~/duckdns/duck.sh >/dev/null 2>&1
 ```
 
 ### 3. Obtener certificado Let's Encrypt
@@ -557,7 +439,6 @@ docker compose start nginx
 ### 5. Renovación automática
 
 ```bash
-# Cron: Cada lunes a las 3:00
 0 3 * * 1 sudo certbot renew --quiet && \
   sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/fullchain.pem \
   ~/TFG_deCastro-Ander/pihole/nginx/certs/fullchain.pem && \
@@ -568,43 +449,37 @@ docker compose start nginx
 
 ## 🔒 Auditoría de Seguridad y Hardening
 
-### Vulnerabilidades Identificadas (Pre-hardening)
+### Vulnerabilidades Corregidas
 
 | ID | Componente | Severidad | Estado |
 |----|-----------|-----------|--------|
-| V1 | Prometheus expuesto en red sin auth | 🔴 Crítica | ✅ Corregida |
+| V1 | Prometheus expuesto | 🔴 Crítica | ✅ Corregida |
 | V2 | Node Exporter expuesto | 🔴 Crítica | ✅ Corregida |
 | V3 | pihole-exporter expuesto | 🔴 Crítica | ✅ Corregida |
 | V4 | Redis sin contraseña | 🔴 Crítica | ✅ Corregida |
-| V5 | ntopng con `--disable-login=1` | 🔴 Crítica | ✅ Corregida |
-| V6 | Contraseña ntopng por defecto | 🔴 Crítica | ✅ Corregida |
-| V7 | Docker socket sin proxy | 🟠 Alta | ✅ Corregida |
-| V8 | Grafana con env_file innecesario | 🟡 Media | ✅ Corregida |
+| V5 | ntopng sin login | 🔴 Crítica | ✅ Corregida |
+| V6 | Docker socket sin proxy | 🟠 Alta | ✅ Corregida |
 
 ### Correcciones Aplicadas
 
-- 🔒 **Prometheus, Node Exporter, pihole-exporter** restringidos a `localhost`
-- 🔒 **Redis** con autenticación obligatoria y contraseña fuerte
-  - Comando: `redis-server --requirepass ${REDIS_PASSWORD}`
-  - Persistencia deshabilitada: `--save "" --appendonly no`
-- 🔒 **ntopng** con login requerido (sintaxis Redis: `127.0.0.1:6379:${REDIS_PASSWORD}@0`)
-- 🔒 **Docker Socket Proxy** implementado con restricciones (CONTAINERS, LOGS, INFO, POST, IMAGES)
-- 🔒 **Dashboard** con carga de credenciales via `env_file` centralizado
-- 🔒 **Tshark** con capabilities mejoradas (`NET_ADMIN`, `NET_RAW`)
-- 🔒 **WireGuard** con 3 peers preconfigurados
-- 🔒 **Sincronización de credenciales** pre-startup
-- 🔒 **TLS obligatorio** en Nginx (HTTPS)
-- 🔒 **CORS restringido** a orígenes locales
+- 🔒 **Redis** - Autenticación obligatoria + sin persistencia
+- 🔒 **ntopng** - Login requerido con sintaxis: `127.0.0.1:6379:${REDIS_PASSWORD}@0`
+- 🔒 **Exportadores** - Restringidos a localhost (Prometheus 9090, Node Exporter 9100, pihole-exporter 9167)
+- 🔒 **Docker Proxy** - Permisos específicos (CONTAINERS, LOGS, INFO, POST, IMAGES)
+- 🔒 **Dashboard** - env_file centralizado
+- 🔒 **Tshark** - Capabilities (NET_ADMIN, NET_RAW)
+- 🔒 **WireGuard** - 3 peers preconfigurados
+- 🔒 **Nginx** - TLS obligatorio
 
-### Superficie de Ataque Residual (Post-hardening)
+### Superficie de Ataque (Post-hardening)
 
-| Puerto | Servicio | Protección | Notas |
-|--------|---------|-----------|-------|
-| 443 | Dashboard Flask | Autenticación + TLS | Recomendado |
-| 80 | Pi-hole admin | Autenticación + HTTP | Considerar HTTPS |
-| 3000 | Grafana | Autenticación + HTTP | Local only |
-| 3001 | ntopng | Autenticación + HTTP | Local only |
-| 51820/UDP | WireGuard | Criptografía ECC | Muy seguro |
+| Puerto | Servicio | Protección |
+|--------|---------|-----------|
+| 443 | Dashboard | Autenticación + TLS |
+| 80 | Pi-hole | Autenticación |
+| 3000 | Grafana | Autenticación |
+| 3001 | ntopng | Autenticación |
+| 51820/UDP | WireGuard | Criptografía ECC |
 
 ---
 
@@ -613,71 +488,43 @@ docker compose start nginx
 ```
 TFG_deCastro-Ander/
 ├── pihole/
-│   ├── docker-compose.yml          # Orquestación 12 microservicios
-│   │   ├── pihole                  # DNS filtering + admin panel
-│   │   ├── redis                   # Cache autenticado (contraseña requerida)
-│   │   ├── ntopng                  # Análisis flujos con login obligatorio
-│   │   ├── tshark-sflow            # Captura paquetes (NET_ADMIN/NET_RAW)
-│   │   ├── nginx                   # Proxy inverso + TLS
-│   │   ├── docker-proxy            # Socket proxy con permisos específicos
-│   │   ├── dashboard               # Flask + env_file centralizado
-│   │   ├── wireguard               # VPN remota (3 peers preconfigurados)
-│   │   ├── node-exporter           # Telemetría localhost (9100)
-│   │   ├── prometheus              # Métricas localhost (9090)
-│   │   ├── pihole-exporter         # Exportador localhost (9167)
-│   │   ├── grafana                 # Visualización históricas
-│   │   └── mitmproxy               # Servicio opcional (profiles)
-│   ├── .env.example                # Plantilla credenciales
-│   ├── prometheus.yml              # Scraping de métricas
+│   ├── docker-compose.yml          # 12 microservicios
+│   │   ├── pihole                  # DNS + admin
+│   │   ├── redis                   # Cache (autenticado)
+│   │   ├── ntopng                  # Flujos (login requerido)
+│   │   ├── tshark-sflow            # Captura paquetes
+│   │   ├── nginx                   # Proxy + TLS
+│   │   ├── docker-proxy            # Socket proxy
+│   │   ├── dashboard               # Flask SIEM
+│   │   ├── wireguard               # VPN (3 peers)
+│   │   ├── node-exporter           # Telemetría
+│   │   ├── prometheus              # Métricas
+│   │   ├── pihole-exporter         # Exportador
+│   │   ├── grafana                 # Visualización
+│   │   └── mitmproxy               # Opcional
+│   ├── .env.example                # Template credenciales
+│   ├── prometheus.yml              # Scraping
 │   ├── nginx/
-│   │   ├── siem.conf              # Proxy inverso config
-│   │   └── certs/                 # Certificados TLS (auto-generados)
-│   └── grafana_data/              # Persistencia Grafana (volumen)
+│   │   ├── siem.conf              # Config proxy
+│   │   └── certs/                 # Certificados TLS
+│   └── grafana_data/              # Persistencia
 ├── dashboard/
-│   ├── app.py                      # Backend Flask (API + alertas)
-│   ├── alerter.py                  # Motor de alertas (6 reglas)
+│   ├── app.py                      # Backend Flask
+│   ├── alerter.py                  # Motor alertas
 │   ├── templates/
-│   │   ├── index.html             # Dashboard principal (gráficas interactivas)
-│   │   ├── sniffer.html           # Captura en vivo (filtrado avanzado)
-│   │   ├── estadisticas.html      # Análisis avanzado con gráficas históricas
-│   │   ├── graficas.html          # Embedidas de Grafana
-│   │   ├── alertas.html           # Centro de alertas (6 reglas, exportación CSV)
-│   │   ├── lateral.html           # Mapa red interna
-│   │   ├── red.html               # Vista red mejorada (topología visual)
-│   │   ├── contenedores.html      # Panel Docker (logs en vivo)
-│   │   └── login.html             # Autenticación (CSRF protection)
+│   │   ├── index.html             # Dashboard principal
+│   │   ├── sniffer.html           # Captura viva
+│   │   ├── estadisticas.html      # Análisis avanzado
+│   │   ├── graficas.html          # Grafana embed
+│   │   ├── alertas.html           # Centro alertas
+│   │   ├── lateral.html           # Red interna
+│   │   ├── red.html               # Red mejorada
+│   │   ├── contenedores.html      # Docker control
+│   │   └── login.html             # Autenticación
 │   ├── static/                     # CSS, JS, assets
-│   │   ├── style.css              # Diseño responsive (móvil/escritorio)
-│   │   ├── chart.js               # Gráficas interactivas
-│   │   └── d3.js                  # Visualización avanzada
 │   └── requirements.txt            # Dependencias Python
-└── wireguard_config/               # Config WireGuard (excluida en .gitignore)
+└── wireguard_config/               # Config WireGuard
 ```
-
-### Mejoras en Docker Compose (v1.0)
-
-| Servicio | Actualización | Detalles |
-|----------|--------------|---------|
-| **redis** | ✅ Autenticación | Contraseña requerida + sin persistencia |
-| **ntopng** | ✅ Login requerido | Sintaxis Redis con contraseña |
-| **dashboard** | ✅ env_file | Carga centralizada de variables |
-| **docker-proxy** | ✅ Permisos | IMAGES=1 agregado para compatibilidad |
-| **exportadores** | ✅ Localhost | node-exporter (9100), prometheus (9090), pihole-exporter (9167) |
-| **tshark** | ✅ Capabilities | NET_ADMIN y NET_RAW para captura |
-| **wireguard** | ✅ Configuración | 3 peers preconfigurados |
-| **mitmproxy** | ✅ Opcional | Disponible con profiles: ["opcional"] |
-
-### Características del Dashboard (v1.0)
-
-| Feature | Descripción | Archivos |
-|---------|-------------|---------|
-| 📊 **Gráficas Interactivas** | Chart.js + D3.js | index.html, estadisticas.html |
-| 🔐 **CSRF Protection** | Seguridad en formularios | login.html, alertas.html |
-| 📱 **Responsive Design** | Móvil y escritorio | static/style.css |
-| 🌙 **Modo Oscuro** | Tema alternativo | static/style.css |
-| 📥 **Exportación** | CSV, JSON | alertas.html |
-| 🔔 **Notificaciones RT** | WebSocket | app.py |
-| 🎯 **Filtrado Avanzado** | Por severidad/tipo | alertas.html, estadisticas.html |
 
 ---
 
@@ -685,31 +532,28 @@ TFG_deCastro-Ander/
 
 | Condición | Consumo | Notas |
 |-----------|---------|-------|
-| Baja carga | ~3-5 W | Inactivo, pocos flujos |
+| Baja carga | ~3-5 W | Inactivo |
 | Carga sostenida | ~7-8 W | Dashboard + ntopng activos |
-| **Coste anual (24/7)** | **< 20 €** | ~30 kWh/año (0.07€/kWh) |
+| **Coste anual** | **< 20 €** | ~30 kWh/año |
 
-**Estimado para PYME típica:**
-- Equipos: 15-50 dispositivos
-- Consumo diario: ~150-200 kWh
-- Ahorros de red: 300-500 € vs soluciones comerciales
+**Para PYME típica:**
+- 15-50 dispositivos
+- Ahorros: 300-500 € vs soluciones comerciales
 
 ---
 
-## 🛡️ Buenas Prácticas Aplicadas
+## 🛡️ Buenas Prácticas
 
-- ✅ **Credenciales en `.env`** (nunca en repositorio)
-- ✅ **Variables de entorno centralizadas** (fácil mantenimiento)
-- ✅ **TLS obligatorio** (Nginx con certificados auto-generados)
-- ✅ **Acceso remoto por VPN** (WireGuard, sin exponer puertos)
-- ✅ **Historial Git limpio** (BFG Repo Cleaner, sin secretos)
-- ✅ **Servicios internos en localhost** (Prometheus, Node Exporter, Redis)
-- ✅ **Docker Socket Proxy** (acceso restrictivo a Docker API)
-- ✅ **Autenticación en ntopng** (login requerido, no --disable-login)
-- ✅ **Notificaciones opcionales** (Telegram, sin API keys en el repositorio)
-- ✅ **Documentación completa** (español, paso a paso)
-- ✅ **Servicios opcionales** (Grafana, Prometheus, Mitmproxy con profiles)
-- ✅ **Persistencia securizada** (Redis sin datos, SQLite encriptado)
+- ✅ Credenciales en `.env` (nunca en repositorio)
+- ✅ Variables centralizadas (fácil mantenimiento)
+- ✅ TLS obligatorio
+- ✅ Acceso remoto por VPN
+- ✅ Historial Git limpio
+- ✅ Servicios internos en localhost
+- ✅ Docker Socket Proxy
+- ✅ Autenticación en ntopng
+- ✅ Servicios opcionales con profiles
+- ✅ Documentación completa
 
 ---
 
@@ -720,11 +564,11 @@ Libre para uso educativo y modificación.
 
 ---
 
-## 🤝 Contacto y Soporte
+## 🤝 Soporte
 
 Para preguntas o problemas:
-1. Revisa la sección de [Solución de Problemas](#-solución-de-problemas-frecuentes)
-2. Abre una **Issue** en GitHub con detalles del error y logs
+1. Revisa [Solución de Problemas](#-solución-de-problemas-frecuentes)
+2. Abre una **Issue** en GitHub con detalles del error
 
 **Última actualización:** 29 de Mayo de 2026  
-**Versión:** 1.0 (Completado)
+**Versión:** 1.0
