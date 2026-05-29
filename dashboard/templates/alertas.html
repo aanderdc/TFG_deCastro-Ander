@@ -222,7 +222,8 @@
 
   async function limpiarAlertas() {
     if (!confirm('¿Borrar todas las alertas?')) return;
-    await fetch('/api/alertas/clear', { method: 'POST' });
+    const t = await fetch('/api/csrf-token').then(r=>r.json());
+    await fetch('/api/alertas/clear', { method: 'POST', headers: {'X-CSRF-Token': t.token} });
     refreshAlertas();
   }
 

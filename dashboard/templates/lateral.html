@@ -417,7 +417,8 @@
 
   async function limpiarLateral() {
     if (!confirm('¿Borrar todas las conexiones internas registradas?')) return;
-    await fetch('/api/lateral/clear', {method:'POST'});
+    const t = await fetch('/api/csrf-token').then(r=>r.json());
+    await fetch('/api/lateral/clear', { method: 'POST', headers: {'X-CSRF-Token': t.token} });
     refreshGrafo();
   }
 

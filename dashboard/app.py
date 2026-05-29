@@ -1,9 +1,8 @@
 import re
-import re
-import re
-import re
 # -*- coding: utf-8 -*-
 import requests
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from flask import Flask, jsonify, render_template, request, redirect, url_for, session
 from datetime import datetime
 import sqlite3
@@ -11,9 +10,11 @@ import threading
 import time
 from functools import wraps
 import os
+import secrets
 import pytz
 
 app = Flask(__name__)
+limiter = Limiter(get_remote_address, app=app, default_limits=[])
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'cambia_esto_en_produccion')
 from datetime import timedelta
 app.permanent_session_lifetime = timedelta(hours=24)
@@ -499,6 +500,14 @@ def background_logger():
 
 # --- RUTAS DE FLASK ---
 
+
+def csrf_protect():
+    token = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
+    if not token or token != session.get('csrf_token'):
+        return jsonify({"ok": False, "error": "CSRF token inválido"}), 403
+    return None
+
+@limiter.limit("10 per minute")
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = None
@@ -506,6 +515,7 @@ def login():
         if request.form['username'] == ADMIN_USER and request.form['password'] == ADMIN_PASS:
             session.permanent = True
             session['logged_in'] = True
+            session['csrf_token'] = secrets.token_hex(16)
             return redirect(url_for('index'))
         error = "Credenciales incorrectas"
     return render_template('login.html', error=error)
@@ -603,9 +613,16 @@ def api_alertas_export_csv():
         headers={"Content-Disposition": "attachment; filename=alertas_siem.csv"}
     )
 
+@app.route('/api/csrf-token')
+@login_required
+def api_csrf_token():
+    return jsonify({"token": session.get('csrf_token', '')})
+
 @app.route('/api/alertas/clear', methods=['POST'])
 @login_required
 def api_alertas_clear():
+    err = csrf_protect()
+    if err: return err
     conn = sqlite3.connect(DB_PATH)
     conn.execute('DELETE FROM alertas')
     conn.commit()
@@ -770,6 +787,8 @@ def api_lateral():
 @app.route('/api/lateral/clear', methods=['POST'])
 @login_required
 def api_lateral_clear():
+    err = csrf_protect()
+    if err: return err
     conn = sqlite3.connect(DB_PATH)
     conn.execute('DELETE FROM lateral_connections')
     conn.commit()
@@ -836,6 +855,8 @@ def api_contenedor_restart(nombre):
 @app.route('/api/contenedores/<nombre>/stop', methods=['POST'])
 @login_required
 def api_contenedor_stop(nombre):
+    err = csrf_protect()
+    if err: return err
     try:
         client = docker_sdk.from_env()
         c = client.containers.get(nombre)
