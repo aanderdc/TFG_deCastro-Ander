@@ -1,19 +1,8 @@
-# 🛡️ Sistema de Control y Seguridad de Red para Pequeñas Empresas
-
+# 🛡️ Guía para más novatos "desde 0"
+Se recomienda leer el otro readme también.
+---
 **Lo que necesitas saber en 30 segundos:**
 Este sistema vigila y protege toda tu red Wi-Fi de la empresa con una pequeña caja llamada Raspberry Pi. Te avisa si algo sospechoso sucede (intrusos, accesos raros, etc.) 24/7. Cuesta ~100€ en hardware y casi nada en electricidad.
-
----
-
-### 📊 Comparación: Con vs Sin este sistema
-
-| Característica | Sin el sistema | Con el sistema |
-|---|---|---|
-| **¿Bloquea virus?** | Tu antivirus solo (débil) | ✅ **Bloquea ANTES de descargar** |
-| **¿Ves qué se descarga?** | No tienes ni idea | ✅ **Gráficos en tiempo real** |
-| **¿Sabes si alguien entra?** | No | ✅ **Alerta instantánea al móvil** |
-| **¿Cuesta mucho?** | Software caro ($$$) | ✅ **~70€ una sola vez** |
-| **¿Consume electricidad?** | N/A | ✅ **Menos de 1€ al mes** |
 
 ---
 
