@@ -2,8 +2,6 @@
 
 **TFG — Grado en Ingeniería en Tecnología de Telecomunicación**  
 **Autor:** Ander de Castro  
-**Estado:** ✅ Completado y Documentado  
-**Stack Principal:** Python 95.3% | HTML 4% | Otros 0.7%
 
 ---
 
@@ -38,22 +36,6 @@ docker ps  # Deberías ver 12 contenedores activos
 
 ---
 
-## 📚 Tabla de Contenidos
-
-1. [Descripción del Proyecto](#-descripción-del-proyecto)
-2. [Arquitectura](#-arquitectura)
-3. [Stack Tecnológico](#️-stack-tecnológico)
-4. [Instalación Rápida](#-instalación-rápida)
-5. [Guía de Usuario](#-guía-de-usuario)
-6. [Funcionalidades](#-funcionalidades-del-dashboard)
-7. [Notificaciones Telegram](#-configuración-de-notificaciones-telegram)
-8. [Solución de Problemas](#-solución-de-problemas-frecuentes)
-9. [Acceso Externo](#-acceso-externo-duckdns--lets-encrypt)
-10. [Auditoría de Seguridad](#-auditoría-de-seguridad-y-hardening)
-11. [Estructura](#-estructura-del-repositorio)
-
----
-
 ## 🎯 Descripción del Proyecto
 
 Sistema de **monitorización y gestión de red** basado en **Raspberry Pi 4** y herramientas de código abierto, orientado a PYMES con presupuesto limitado.
@@ -68,60 +50,6 @@ Sistema de **monitorización y gestión de red** basado en **Raspberry Pi 4** y 
 - ✅ Notificaciones automáticas por Telegram
 - ✅ Acceso remoto seguro via VPN (WireGuard)
 - ✅ Certificados TLS con Let's Encrypt
-
----
-
-## 🏗️ Arquitectura
-
-```
-INTERNET
-│
-▼
-┌─────────────────────────┐
-│      ROUTER PYME        │
-│     192.168.1.1         │
-└────────┬────────────────┘
-         │
-    ┌────┴─────────┐
-    │              │
-  LAN          WiFi
-    │              │
-    └────┬─────────┘
-         ▼
-┌──────────────────────────────┐
-│    RASPBERRY PI 4 (Central)  │
-│  - Pi-hole (DNS Filtering)   │
-│  - ntopng (Análisis flujos)  │
-│  - Dashboard Flask (SIEM)    │
-│  - Grafana (Históricas)      │
-│  - Prometheus (Métricas)     │
-│  - WireGuard (VPN remota)    │
-│  - Nginx (Proxy + TLS)       │
-└──────────────────────────────┘
-         │
-    ┌────┴──────────────────┐
-    ▼                       ▼
- Clientes              Acceso
-  locales             externo
-   (DNS)            (DuckDNS +
-                    Let's Encrypt)
-```
-
----
-
-## 🛠️ Stack Tecnológico
-
-| Servicio | Función | Puertos | Autenticación |
-|----------|---------|---------|---------------|
-| **Pi-hole** | Filtrado DNS preventivo | 53/UDP, 80/TCP | Contraseña |
-| **ntopng** | Análisis flujos TCP/UDP | 3001/TCP | ✅ Login requerido |
-| **Flask** | Dashboard web + alertas | 5000 (interno) | ✅ Autenticación |
-| **Grafana** | Visualización históricas | 3000/TCP | ✅ Login requerido |
-| **Prometheus** | Métricas hardware | 9090 (localhost) | 🔒 Localhost only |
-| **Redis** | Caché de flujos | 6379 (interno) | ✅ Contraseña |
-| **Nginx** | Proxy inverso + TLS | 443/TCP, 80/TCP | ✅ TLS obligatorio |
-| **WireGuard** | VPN remota | 51820/UDP | ✅ Criptografía ECC |
-| **Docker Proxy** | Acceso seguro Docker API | 2375 (interno) | 🔒 Restringido |
 
 ---
 
@@ -163,17 +91,6 @@ docker ps
 
 ---
 
-## 👥 Matriz de Acceso
-
-| Servicio | URL | Credenciales | Acceso | Encriptación |
-|----------|-----|--------------|--------|--------------|
-| **Dashboard** | `https://IP` | `DASHBOARD_USER` / `DASHBOARD_PASSWORD` | Red local + VPN | ✅ TLS |
-| **Pi-hole** | `http://IP:80` | `PIHOLE_PASSWORD` | Red local | ❌ HTTP |
-| **Grafana** | `http://IP:3000` | `admin` / `GRAFANA_PASSWORD` | Red local | ❌ HTTP |
-| **ntopng** | `http://IP:3001` | `admin` / `NTOPNG_PASSWORD` | Red local | ❌ HTTP |
-| **WireGuard** | IP pública:51820/UDP | Certificados | Acceso remoto | ✅ ECC |
-
----
 
 ## 📲 Configuración de Notificaciones Telegram
 
@@ -278,24 +195,24 @@ Abre `https://IP_DE_TU_RASPBERRY` - Acepta el certificado
 
 ### Vistas Principales
 
-#### 1. 📊 Dashboard Principal (`index.html`)
+#### 1. 📊 Dashboard Principal
 - Métricas DNS en tiempo real
 - Dispositivos activos en la red
 - Consumo de ancho de banda
 - Alertas recientes con severidad
 - Estado de servicios críticos
 
-#### 2. 📡 Sniffer (`sniffer.html`)
+#### 2. 📡 Sniffer
 - Análisis de paquetes HTTP/DNS en tiempo real
 - Filtrado por dominio, IP, puerto
 - Detalles de transacciones
 
-#### 3. 📊 Estadísticas (`estadisticas.html`)
+#### 3. 📊 Estadísticas
 - Gráficas históricas (6h, 24h, 48h, 7 días)
 - Consultas DNS bloqueadas
 - Tráfico por dispositivo
 
-#### 4. 📈 Gráficas (`graficas.html`)
+#### 4. 📈 Gráficas
 - Embedidas de Grafana
 - Series temporales
 
@@ -304,12 +221,12 @@ Abre `https://IP_DE_TU_RASPBERRY` - Acepta el certificado
 - Severidad: Crítica, Alta, Media, Baja
 - Exportación a CSV
 
-#### 6. 🗺️ Red (`lateral.html` + `red.html`)
+#### 6. 🗺️ Red
 - Mapa visual de conexiones
 - Detección de escaneos internos
 - Análisis de movimiento lateral
 
-#### 7. 🐳 Docker (`contenedores.html`)
+#### 7. 🐳 Docker
 - Estado de los 12 contenedores
 - Logs en tiempo real
 - Botones: Iniciar/Parar/Reiniciar
@@ -333,7 +250,7 @@ Abre `https://IP_DE_TU_RASPBERRY` - Acepta el certificado
 - **Hagezi Multi Pro** — Telemetría, rastreadores, malware, C2
 - **StevenBlack/hosts** — Publicidad y trackers
 
-**Base activa:** 250,000+ dominios bloqueados
+Listas Hagezi: https://github.com/hagezi/dns-blocklists
 
 ---
 
@@ -447,42 +364,38 @@ docker compose start nginx
 
 ---
 
-## 🔒 Auditoría de Seguridad y Hardening
-
-### Vulnerabilidades Corregidas
-
-| ID | Componente | Severidad | Estado |
-|----|-----------|-----------|--------|
-| V1 | Prometheus expuesto | 🔴 Crítica | ✅ Corregida |
-| V2 | Node Exporter expuesto | 🔴 Crítica | ✅ Corregida |
-| V3 | pihole-exporter expuesto | 🔴 Crítica | ✅ Corregida |
-| V4 | Redis sin contraseña | 🔴 Crítica | ✅ Corregida |
-| V5 | ntopng sin login | 🔴 Crítica | ✅ Corregida |
-| V6 | Docker socket sin proxy | 🟠 Alta | ✅ Corregida |
-
-### Correcciones Aplicadas
-
-- 🔒 **Redis** - Autenticación obligatoria + sin persistencia
-- 🔒 **ntopng** - Login requerido con sintaxis: `127.0.0.1:6379:${REDIS_PASSWORD}@0`
-- 🔒 **Exportadores** - Restringidos a localhost (Prometheus 9090, Node Exporter 9100, pihole-exporter 9167)
-- 🔒 **Docker Proxy** - Permisos específicos (CONTAINERS, LOGS, INFO, POST, IMAGES)
-- 🔒 **Dashboard** - env_file centralizado
-- 🔒 **Tshark** - Capabilities (NET_ADMIN, NET_RAW)
-- 🔒 **WireGuard** - 3 peers preconfigurados
-- 🔒 **Nginx** - TLS obligatorio
-
-### Superficie de Ataque (Post-hardening)
-
-| Puerto | Servicio | Protección |
-|--------|---------|-----------|
-| 443 | Dashboard | Autenticación + TLS |
-| 80 | Pi-hole | Autenticación |
-| 3000 | Grafana | Autenticación |
-| 3001 | ntopng | Autenticación |
-| 51820/UDP | WireGuard | Criptografía ECC |
-
 ---
 
+## 📲 Configuración de Notificaciones Telegram
+
+### Paso 1: Crear el bot
+
+1. Abre Telegram y busca **@BotFather**
+2. Envía `/newbot`
+3. Elige un nombre y username
+4. Guarda el **token** que te proporciona
+
+### Paso 2: Obtener Chat ID
+
+```bash
+curl "https://api.telegram.org/botTU_TOKEN/getUpdates"
+```
+
+Busca el campo `"id"` dentro de `"chat"`.
+
+### Paso 3: Configurar .env
+
+```env
+TELEGRAM_TOKEN=tu_token_aqui
+TELEGRAM_CHAT_ID=tu_chat_id_aqui
+```
+
+### Paso 4: Reiniciar
+
+```bash
+cd ~/TFG_deCastro-Ander/pihole
+docker compose restart dashboard
+```
 ## 📁 Estructura del Repositorio
 
 ```
@@ -525,42 +438,11 @@ TFG_deCastro-Ander/
 │   └── requirements.txt            # Dependencias Python
 └── wireguard_config/               # Config WireGuard
 ```
-
----
-
-## ⚡ Eficiencia Energética
-
-| Condición | Consumo | Notas |
-|-----------|---------|-------|
-| Baja carga | ~3-5 W | Inactivo |
-| Carga sostenida | ~7-8 W | Dashboard + ntopng activos |
-| **Coste anual** | **< 20 €** | ~30 kWh/año |
-
-**Para PYME típica:**
-- 15-50 dispositivos
-- Ahorros: 300-500 € vs soluciones comerciales
-
----
-
-## 🛡️ Buenas Prácticas
-
-- ✅ Credenciales en `.env` (nunca en repositorio)
-- ✅ Variables centralizadas (fácil mantenimiento)
-- ✅ TLS obligatorio
-- ✅ Acceso remoto por VPN
-- ✅ Historial Git limpio
-- ✅ Servicios internos en localhost
-- ✅ Docker Socket Proxy
-- ✅ Autenticación en ntopng
-- ✅ Servicios opcionales con profiles
-- ✅ Documentación completa
-
 ---
 
 ## 📄 Licencia
 
 Proyecto académico — Trabajo de Fin de Grado.  
-Libre para uso educativo y modificación.
 
 ---
 
