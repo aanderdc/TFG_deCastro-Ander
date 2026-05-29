@@ -1,4 +1,4 @@
-# 🛡️ Sistema de Monitorización y Gestión de Red de Bajo Coste para PYME
+# 🛡️ Sistema de Monitorización y Gestión de Red de bajo coste para entorno PYME
 
 **TFG — Grado en Ingeniería en Tecnología de Telecomunicación**  
 **Autor:** Ander de Castro  
