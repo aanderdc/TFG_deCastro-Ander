@@ -56,6 +56,7 @@ docker ps  # Deberías ver 12 contenedores activos
 14. [Estructura del Repositorio](#-estructura-del-repositorio)
 15. [Eficiencia Energética](#-eficiencia-energética)
 16. [Buenas Prácticas](#-buenas-prácticas-aplicadas)
+17. [Cambios Recientes](#-cambios-recientes)
 
 ---
 
@@ -605,10 +606,13 @@ TFG_deCastro-Ander/
 │   ├── templates/
 │   │   ├── index.html             # Dashboard principal
 │   │   ├── sniffer.html           # Captura en vivo
+│   │   ├── estadisticas.html      # Estadísticas avanzadas
 │   │   ├── graficas.html          # Históricas (Grafana embed)
 │   │   ├── alertas.html           # Centro de alertas
 │   │   ├── lateral.html           # Mapa red interna
-│   │   └── contenedores.html      # Panel Docker
+│   │   ├── red.html               # Vista de red mejorada
+│   │   ├── contenedores.html      # Panel Docker
+│   │   └── login.html             # Página de login
 │   ├── static/                     # CSS, JS, assets
 │   └── requirements.txt            # Dependencias Python
 └── wireguard_config/               # Config WireGuard (excluida en .gitignore)
@@ -643,6 +647,58 @@ TFG_deCastro-Ander/
 - ✅ **Autenticación en ntopng** (login requerido, no --disable-login)
 - ✅ **Notificaciones opcionales** (Telegram, sin API keys en el repositorio)
 - ✅ **Documentación completa** (español, paso a paso)
+
+---
+
+## 📦 Cambios Recientes
+
+### Docker Compose (v1.0 - Mayo 2026)
+
+#### Servicios Actualizados
+| Servicio | Cambio | Detalles |
+|----------|--------|---------|
+| **redis** | ✅ Autenticación obligatoria | Comando: `redis-server --requirepass ${REDIS_PASSWORD}` |
+| **ntopng** | ✅ Login requerido | Sintaxis Redis: `127.0.0.1:6379:${REDIS_PASSWORD}@0` |
+| **dashboard** | ✅ Variables de entorno via `env_file` | Carga de `.env` automática |
+| **docker-proxy** | ✅ Permisos completos | Agregado `IMAGES=1` para compatibilidad total |
+| **node-exporter** | ✅ Localhost binding | Puerto `127.0.0.1:9100` (sin exposición externa) |
+| **prometheus** | ✅ Localhost binding | Puerto `127.0.0.1:9090` (sin exposición externa) |
+| **pihole-exporter** | ✅ Localhost binding | Puerto `127.0.0.1:9167` (sin exposición externa) |
+| **tshark-sflow** | ✅ Captura mejorada | Agregado `cap_add` para NET_ADMIN/NET_RAW |
+| **wireguard** | ✅ Configuración segura | WireGuard con 3 peers preconfigurados |
+| **mitmproxy** | ✅ Servicio opcional | Disponible con `profiles: ["opcional"]` |
+
+#### Cambios de Seguridad
+- 🔒 **Redis**: Contraseña requerida, persistencia deshabilitada (`--save "" --appendonly no`)
+- 🔒 **Prometheus/Node Exporter**: Restringidos a localhost
+- 🔒 **ntopng**: Login obligatorio en lugar de `--disable-login=1`
+- 🔒 **Docker Socket Proxy**: Permisos específicos (CONTAINERS, LOGS, INFO, POST, IMAGES)
+
+---
+
+### Plantillas HTML (v1.0 - Mayo 2026)
+
+#### Vistas del Dashboard
+| Archivo | Propósito | Características |
+|---------|-----------|-----------------|
+| **index.html** | Dashboard principal | Gráficas en tiempo real, dispositivos activos, alertas recientes |
+| **sniffer.html** | Captura de paquetes en vivo | Filtrado por dominio/IP/puerto, detalles de transacciones |
+| **estadisticas.html** | Análisis avanzado de tráfico | Gráficas históricas, tendencias, picos de uso |
+| **graficas.html** | Embedidas de Grafana | Visualización de series temporales |
+| **alertas.html** | Centro de alertas | 6 reglas de detección, clasificación por severidad, exportación CSV |
+| **lateral.html** | Mapa de red interna | Conexiones entre dispositivos, escaneos internos, análisis de movimiento lateral |
+| **red.html** | Vista de red mejorada | Topología visual, puertos críticos, análisis de tráfico por dispositivo |
+| **contenedores.html** | Panel de Docker | Estado de servicios, logs en vivo, botones de control (iniciar/parar/reiniciar) |
+| **login.html** | Página de autenticación | Formulario seguro con CSRF protection |
+
+#### Features Nuevos
+- 📊 **Gráficas interactivas** con Chart.js / D3.js
+- 🔐 **CSRF protection** en formularios
+- 📱 **Diseño responsive** para móvil y escritorio
+- 🌙 **Modo oscuro** (opcional)
+- 📥 **Exportación de datos** (CSV, JSON)
+- 🔔 **Notificaciones en tiempo real** (WebSocket)
+- 🎯 **Filtrado avanzado** de alertas por severidad y tipo
 
 ---
 
