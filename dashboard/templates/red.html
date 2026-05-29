@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monitor de Red — S.I.E.M.</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary-dark: #0f172a;
+      --bg-light: #f8fafc;
+      --green: #22c55e;
+      --cyan: #06b6d4;
+      --yellow: #eab308;
+      --red: #ef4444;
+      --orange: #f97316;
+    }
+
+    body {
+      background-color: var(--bg-light);
+      color: #334155;
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    .header-bar {
+      background-color: var(--primary-dark);
+      color: white;
+      padding: 1.2rem 0;
+      border-bottom: 3px solid #334155;
+      margin-bottom: 2rem;
+      position: relative;
+    }
+
+    .nav-btn {
+      background-color: white;
+      color: var(--primary-dark);
+      text-decoration: none;
+      padding: 0.8rem;
+      border-radius: 8px;
+      display: inline-block;
+      text-align: center;
+      font-weight: 600;
+      border: 2px solid #e2e8f0;
+      transition: all 0.2s;
+      font-size: 0.85rem;
+    }
+    .nav-btn:hover { background-color: var(--primary-dark); color: white; }
+    .nav-btn.active { background: var(--primary-dark); color: white; }
+
+    /* ── METRIC CARDS ── */
+    .metric-card {
+      background: white;
+      border-radius: 10px;
+      padding: 1.2rem 1.5rem;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+
+    .metric-card.c-green::before { background: var(--green); }
+    .metric-card.c-cyan::before  { background: var(--cyan); }
+    .metric-card.c-yellow::before { background: var(--yellow); }
+    .metric-card.c-orange::before { background: var(--orange); }
+    .metric-card.c-red::before   { background: var(--red); }
+
+    .metric-label {
+      color: #64748b;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+      letter-spacing: 0.5px;
+    }
+
+    .metric-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #1e293b;
+      line-height: 1;
+      font-family: 'Share Tech Mono', monospace;
+    }
+
+    .metric-unit {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      font-weight: 400;
+    }
+
+    .metric-sub {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      margin-top: 0.4rem;
+    }
+
+    /* ── PROGRESS BAR ── */
+    .metric-progress {
+      height: 4px;
+      background: #e2e8f0;
+      border-radius: 2px;
+      margin-top: 0.8rem;
+      overflow: hidden;
+    }
+
+    .metric-progress-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.8s ease;
+    }
+
+    /* ── CHART PANEL ── */
+    .chart-panel {
+      background: white;
+      border-radius: 10px;
+      padding: 1.5rem;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .chart-title {
+      color: #64748b;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.8rem;
+    }
+
+    .chart-speed {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 0.5rem;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 80px !important;
+      display: block;
+    }
+
+    /* ── TABLE PANEL ── */
+    .table-panel {
+      background: white;
+      border-radius: 10px;
+      padding: 1.5rem;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .panel-title {
+      color: #64748b;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── PIHOLE STATS ── */
+    .pihole-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+    }
+
+    .pihole-stat {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .pihole-stat-val {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #1e293b;
+    }
+
+    .pihole-stat-label {
+      font-size: 0.68rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 0.3rem;
+    }
+
+    /* ── ALERTS ── */
+    .alert-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.8rem;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 0.8rem;
+    }
+    .alert-item:last-child { border-bottom: none; }
+    .alert-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      margin-top: 0.3rem;
+      flex-shrink: 0;
+    }
+    .alert-time {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.7rem;
+      color: #94a3b8;
+      white-space: nowrap;
+    }
+    .alert-empty { color: #94a3b8; font-size: 0.8rem; }
+
+    /* ── LIVE DOT ── */
+    .live-dot {
+      display: inline-block; width: 7px; height: 7px;
+      border-radius: 50%; background: #22c55e; margin-right: 6px;
+      animation: blink 1.2s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+    /* ── STATUS BADGE ── */
+    .badge-ok      { background:#dcfce7; color:#166534; font-size:0.65rem; padding:2px 8px; border-radius:4px; }
+    .badge-warn    { background:#fef9c3; color:#854d0e; font-size:0.65rem; padding:2px 8px; border-radius:4px; }
+    .badge-danger  { background:#fee2e2; color:#991b1b; font-size:0.65rem; padding:2px 8px; border-radius:4px; }
+    .badge-offline { background:#f1f5f9; color:#64748b; font-size:0.65rem; padding:2px 8px; border-radius:4px; }
+  </style>
+</head>
+<body>
+
+<div class="header-bar text-center">
+  <div class="container">
+    <h3 class="mb-1 fw-bold">MONITOR DE RED</h3>
+    <p class="mb-0 text-uppercase" style="font-size:0.8rem;color:#94a3b8;letter-spacing:2px;">TFG — Ander de Castro</p>
+  </div>
+  <a href="/logout" style="position:absolute;top:50%;right:24px;transform:translateY(-50%);
+      color:#94a3b8;font-size:0.75rem;font-weight:600;text-decoration:none;
+      border:1px solid #334155;padding:6px 14px;border-radius:6px;
+      text-transform:uppercase;letter-spacing:1px;"
+      onmouseover="this.style.color='#fff';this.style.borderColor='#ef4444'"
+      onmouseout="this.style.color='#94a3b8';this.style.borderColor='#334155'">
+      Salir →
+  </a>
+</div>
+
+<div class="container-fluid px-4">
+
+  <!-- NAV -->
+  <div class="d-flex gap-2 mb-4 flex-wrap">
+    <a href="/"            class="nav-btn">Dashboard</a>
+    <a href="/sniffer"     class="nav-btn">Sniffer</a>
+    <a href="/graficas"    class="nav-btn">Gráficas</a>
+    <a href="/alertas"     class="nav-btn">Alertas</a>
+    <a href="/lateral"     class="nav-btn">Red Interna</a>
+    <a href="/contenedores" class="nav-btn">Contenedores</a>
+    <a href="/red"         class="nav-btn active">Monitor Red</a>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="d-flex align-items-center gap-3 mb-3" style="font-size:0.78rem;color:#64748b;">
+    <span><span class="live-dot"></span><span id="conn-status" style="color:#22c55e;font-weight:600;">ONLINE</span></span>
+    <span id="clock" style="font-family:'Share Tech Mono',monospace;">--:--:--</span>
+    <span>Auto-refresh 3s</span>
+    <span id="last-update" class="ms-auto text-muted"></span>
+  </div>
+
+  <!-- METRIC CARDS -->
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+      <div class="metric-card c-green">
+        <div class="metric-label">CPU Load</div>
+        <div class="metric-value" id="cpu-val">--<span class="metric-unit"> %</span></div>
+        <div class="metric-sub" id="cpu-load">load avg: --</div>
+        <div class="metric-progress">
+          <div class="metric-progress-fill" id="cpu-bar" style="width:0%;background:#22c55e"></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="metric-card c-cyan">
+        <div class="metric-label">Memoria RAM</div>
+        <div class="metric-value" id="ram-val">--<span class="metric-unit"> %</span></div>
+        <div class="metric-sub" id="ram-sub">-- / -- GB</div>
+        <div class="metric-progress">
+          <div class="metric-progress-fill" id="ram-bar" style="width:0%;background:#06b6d4"></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="metric-card c-yellow">
+        <div class="metric-label">Disco</div>
+        <div class="metric-value" id="disk-val">--<span class="metric-unit"> %</span></div>
+        <div class="metric-sub" id="disk-sub">-- GB libres</div>
+        <div class="metric-progress">
+          <div class="metric-progress-fill" id="disk-bar" style="width:0%;background:#eab308"></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="metric-card c-orange">
+        <div class="metric-label">Temperatura</div>
+        <div class="metric-value" id="temp-val">--<span class="metric-unit"> °C</span></div>
+        <div class="metric-sub" id="temp-sub">Raspberry Pi CPU</div>
+        <div class="metric-progress">
+          <div class="metric-progress-fill" id="temp-bar" style="width:0%;background:#f97316"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW -->
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-md-6">
+      <div class="chart-panel">
+        <div class="chart-title">↓ Descarga — wlan0</div>
+        <div class="d-flex justify-content-between align-items-baseline mb-2">
+          <div class="chart-speed" id="dl-speed" style="color:#22c55e">-- KB/s</div>
+          <div style="font-size:0.75rem;color:#94a3b8;">Total: <span id="dl-total">--</span></div>
+        </div>
+        <canvas id="chart-dl"></canvas>
+      </div>
+    </div>
+    <div class="col-12 col-md-6">
+      <div class="chart-panel">
+        <div class="chart-title">↑ Subida — wlan0</div>
+        <div class="d-flex justify-content-between align-items-baseline mb-2">
+          <div class="chart-speed" id="ul-speed" style="color:#06b6d4">-- KB/s</div>
+          <div style="font-size:0.75rem;color:#94a3b8;">Total: <span id="ul-total">--</span></div>
+        </div>
+        <canvas id="chart-ul"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERFACES + ALERTS -->
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-md-7">
+      <div class="table-panel">
+        <div class="panel-header">
+          <span class="panel-title">Interfaces de red</span>
+          <span style="font-size:0.72rem;color:#94a3b8;" id="iface-update"></span>
+        </div>
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="font-size:0.72rem;">Interfaz</th>
+              <th style="font-size:0.72rem;">↓ Recibido</th>
+              <th style="font-size:0.72rem;">↑ Enviado</th>
+              <th style="font-size:0.72rem;">Velocidad ↓</th>
+              <th style="font-size:0.72rem;">Velocidad ↑</th>
+              <th style="font-size:0.72rem;">Estado</th>
+            </tr>
+          </thead>
+          <tbody id="ifaces-tbody">
+            <tr><td colspan="6" class="text-center text-muted py-3">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="col-12 col-md-5">
+      <div class="table-panel" style="height:100%;">
+        <div class="panel-header">
+          <span class="panel-title">⚠ Alertas del sistema</span>
+          <span id="alerts-count" style="font-size:0.72rem;color:#94a3b8;">0 alertas</span>
+        </div>
+        <div id="alerts-list">
+          <div class="alert-empty">Sin alertas activas.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIHOLE -->
+  <div class="row g-3 mb-4">
+    <div class="col-12">
+      <div class="table-panel">
+        <div class="panel-header">
+          <span class="panel-title">Pi-hole — Estadísticas DNS</span>
+          <span id="pihole-status" class="badge-ok">Conectado</span>
+        </div>
+        <div class="pihole-grid">
+          <div class="pihole-stat">
+            <div class="pihole-stat-val" id="ph-queries">--</div>
+            <div class="pihole-stat-label">Consultas hoy</div>
+          </div>
+          <div class="pihole-stat">
+            <div class="pihole-stat-val" id="ph-blocked" style="color:#ef4444">--</div>
+            <div class="pihole-stat-label">Bloqueadas</div>
+          </div>
+          <div class="pihole-stat">
+            <div class="pihole-stat-val" id="ph-percent" style="color:#eab308">--%</div>
+            <div class="pihole-stat-label">% bloqueado</div>
+          </div>
+          <div class="pihole-stat">
+            <div class="pihole-stat-val" id="ph-clients" style="color:#06b6d4">--</div>
+            <div class="pihole-stat-label">Clientes activos</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ════════════════════════════════════════════
+//  CONFIG — usa la API proxy de Flask
+// ════════════════════════════════════════════
+const REFRESH_MS  = 3000;
+const HISTORY_LEN = 40;
+
+const history = {
+  dl: Array(HISTORY_LEN).fill(0),
+  ul: Array(HISTORY_LEN).fill(0)
+};
+const prev = { net: {} };
+const alerts = [];
+let lastFetch = Date.now();
+
+// ════════════════════════════════════════════
+//  RELOJ
+// ════════════════════════════════════════════
+function updateClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('es-ES');
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ════════════════════════════════════════════
+//  UTILIDADES
+// ════════════════════════════════════════════
+function fmtBytes(b) {
+  if (b > 1e9) return (b/1e9).toFixed(2) + ' GB';
+  if (b > 1e6) return (b/1e6).toFixed(1) + ' MB';
+  if (b > 1e3) return (b/1e3).toFixed(1) + ' KB';
+  return (b||0).toFixed(0) + ' B';
+}
+
+function fmtSpeed(b) {
+  if (b > 1e6) return (b/1e6).toFixed(2) + ' MB/s';
+  return (b/1e3).toFixed(1) + ' KB/s';
+}
+
+function colorBar(pct) {
+  if (pct > 90) return '#ef4444';
+  if (pct > 70) return '#eab308';
+  return '#22c55e';
+}
+
+function colorTemp(t) {
+  if (t > 75) return '#ef4444';
+  if (t > 60) return '#f97316';
+  return '#22c55e';
+}
+
+function setVal(id, html) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+}
+
+function setBar(id, pct, color) {
+  const el = document.getElementById(id);
+  if (el) { el.style.width = Math.min(pct,100)+'%'; el.style.background = color; }
+}
+
+function addAlert(msg, color) {
+  const time = new Date().toLocaleTimeString('es-ES');
+  // Evitar duplicados en la misma ventana de tiempo
+  if (alerts.length && alerts[0].msg === msg) return;
+  alerts.unshift({ msg, color, time });
+  if (alerts.length > 8) alerts.pop();
+  renderAlerts();
+}
+
+function renderAlerts() {
+  const el = document.getElementById('alerts-list');
+  document.getElementById('alerts-count').textContent = alerts.length + ' alerta' + (alerts.length !== 1 ? 's' : '');
+  if (!alerts.length) {
+    el.innerHTML = '<div class="alert-empty">Sin alertas activas.</div>';
+    return;
+  }
+  el.innerHTML = alerts.map(a => `
+    <div class="alert-item">
+      <div class="alert-dot" style="background:${a.color}"></div>
+      <span class="alert-time">${a.time}</span>
+      <span style="flex:1;font-size:0.8rem;">${a.msg}</span>
+    </div>
+  `).join('');
+}
+
+// ════════════════════════════════════════════
+//  CANVAS CHARTS
+// ════════════════════════════════════════════
+function drawChart(id, data, color) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const W = canvas.offsetWidth || 400;
+  const H = 80;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  const max = Math.max(...data, 1);
+  const step = W / (data.length - 1);
+
+  // grid lines
+  ctx.strokeStyle = '#f1f5f9';
+  ctx.lineWidth = 1;
+  [0.25, 0.5, 0.75].forEach(f => {
+    ctx.beginPath();
+    ctx.moveTo(0, H - f*H); ctx.lineTo(W, H - f*H);
+    ctx.stroke();
+  });
+
+  // fill
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  data.forEach((v, i) => ctx.lineTo(i * step, H - (v/max)*H*0.88));
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, color + '30');
+  grad.addColorStop(1, 'transparent');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // line
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    const x = i * step;
+    const y = H - (v/max)*H*0.88;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+// ════════════════════════════════════════════
+//  FETCH MÉTRICAS — via API de Flask
+// ════════════════════════════════════════════
+async function fetchMetrics() {
+  try {
+    const resp = await fetch('/api/red/metrics', { cache: 'no-store' });
+    const d = await resp.json();
+
+    if (!d.ok) throw new Error(d.error || 'Error');
+
+    const now = Date.now();
+    const dt = (now - lastFetch) / 1000;
+    lastFetch = now;
+
+    // ── CPU ──
+    const cpuPct = Math.min(d.load1 * 25, 100);
+    const cpuColor = colorBar(cpuPct);
+    setVal('cpu-val', cpuPct.toFixed(0) + '<span class="metric-unit"> %</span>');
+    setVal('cpu-load', `load: ${d.load1.toFixed(2)} / ${d.load5.toFixed(2)}`);
+    setBar('cpu-bar', cpuPct, cpuColor);
+    if (cpuPct > 85) addAlert(`CPU alta: ${cpuPct.toFixed(0)}%`, '#ef4444');
+
+    // ── RAM ──
+    const memPct = ((d.mem_total - d.mem_avail) / d.mem_total) * 100;
+    const memUsed = d.mem_total - d.mem_avail;
+    const ramColor = colorBar(memPct);
+    setVal('ram-val', memPct.toFixed(0) + '<span class="metric-unit"> %</span>');
+    setVal('ram-sub', `${(memUsed/1e9).toFixed(1)} / ${(d.mem_total/1e9).toFixed(1)} GB usados`);
+    setBar('ram-bar', memPct, ramColor);
+    if (memPct > 85) addAlert(`RAM alta: ${memPct.toFixed(0)}%`, '#eab308');
+
+    // ── DISCO ──
+    if (d.disk_size) {
+      const diskUsed = d.disk_size - d.disk_avail;
+      const diskPct = (diskUsed / d.disk_size) * 100;
+      const diskColor = colorBar(diskPct);
+      setVal('disk-val', diskPct.toFixed(0) + '<span class="metric-unit"> %</span>');
+      setVal('disk-sub', `${(d.disk_avail/1e9).toFixed(0)} GB libres de ${(d.disk_size/1e9).toFixed(0)} GB`);
+      setBar('disk-bar', diskPct, diskColor);
+    }
+
+    // ── TEMPERATURA ──
+    if (d.temp !== null) {
+      const tColor = colorTemp(d.temp);
+      setVal('temp-val', d.temp.toFixed(1) + '<span class="metric-unit"> °C</span>');
+      setBar('temp-bar', (d.temp/85)*100, tColor);
+      if (d.temp > 75) addAlert(`Temperatura crítica: ${d.temp.toFixed(1)}°C`, '#ef4444');
+    } else {
+      setVal('temp-val', 'N/A<span class="metric-unit"></span>');
+      setVal('temp-sub', 'No disponible');
+    }
+
+    // ── RED wlan0 ──
+    if (d.net_rx !== undefined) {
+      if (prev.net.rx !== undefined) {
+        const dl = Math.max(0, (d.net_rx - prev.net.rx) / dt);
+        const ul = Math.max(0, (d.net_tx - prev.net.tx) / dt);
+        history.dl.push(dl); history.dl.shift();
+        history.ul.push(ul); history.ul.shift();
+        setVal('dl-speed', fmtSpeed(dl));
+        setVal('ul-speed', fmtSpeed(ul));
+        drawChart('chart-dl', history.dl, '#22c55e');
+        drawChart('chart-ul', history.ul, '#06b6d4');
+        if (dl > 10e6) addAlert(`Descarga alta: ${fmtSpeed(dl)}`, '#eab308');
+      }
+      setVal('dl-total', fmtBytes(d.net_rx));
+      setVal('ul-total', fmtBytes(d.net_tx));
+      prev.net.rx = d.net_rx;
+      prev.net.tx = d.net_tx;
+    }
+
+    // ── INTERFACES ──
+    const ifaces = d.interfaces || [];
+    const rows = ifaces.filter(i => i.name !== 'lo').map(iface => {
+      const rxSpeed = prev.net[iface.name+'_rx'] !== undefined
+        ? Math.max(0, (iface.rx - prev.net[iface.name+'_rx']) / dt) : 0;
+      const txSpeed = prev.net[iface.name+'_tx'] !== undefined
+        ? Math.max(0, (iface.tx - prev.net[iface.name+'_tx']) / dt) : 0;
+      prev.net[iface.name+'_rx'] = iface.rx;
+      prev.net[iface.name+'_tx'] = iface.tx;
+      return `<tr>
+        <td class="fw-bold small" style="font-family:'Share Tech Mono',monospace;">${iface.name}</td>
+        <td class="small">${fmtBytes(iface.rx)}</td>
+        <td class="small">${fmtBytes(iface.tx)}</td>
+        <td class="small" style="color:#22c55e;font-family:'Share Tech Mono',monospace;">↓ ${fmtSpeed(rxSpeed)}</td>
+        <td class="small" style="color:#06b6d4;font-family:'Share Tech Mono',monospace;">↑ ${fmtSpeed(txSpeed)}</td>
+        <td><span class="badge-ok">UP</span></td>
+      </tr>`;
+    }).join('');
+    document.getElementById('ifaces-tbody').innerHTML = rows || '<tr><td colspan="6" class="text-center text-muted">Sin datos</td></tr>';
+
+    document.getElementById('conn-status').textContent = 'ONLINE';
+    document.getElementById('conn-status').style.color = '#22c55e';
+    document.getElementById('last-update').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es-ES');
+
+  } catch(e) {
+    document.getElementById('conn-status').textContent = 'OFFLINE';
+    document.getElementById('conn-status').style.color = '#ef4444';
+    addAlert('Error conectando con node-exporter: ' + e.message, '#ef4444');
+  }
+}
+
+// ════════════════════════════════════════════
+//  FETCH PIHOLE
+// ════════════════════════════════════════════
+async function fetchPihole() {
+  try {
+    const resp = await fetch('/api/red/pihole', { cache: 'no-store' });
+    const d = await resp.json();
+    if (!d.ok) throw new Error();
+    setVal('ph-queries', typeof d.queries === 'number' ? d.queries.toLocaleString() : '--');
+    setVal('ph-blocked', typeof d.blocked === 'number' ? d.blocked.toLocaleString() : '--');
+    setVal('ph-percent', typeof d.percent === 'number' ? d.percent.toFixed(1) + '%' : '--%');
+    setVal('ph-clients', d.clients ?? '--');
+    document.getElementById('pihole-status').className = 'badge-ok';
+    document.getElementById('pihole-status').textContent = 'Conectado';
+  } catch(e) {
+    document.getElementById('pihole-status').className = 'badge-offline';
+    document.getElementById('pihole-status').textContent = 'Sin datos';
+  }
+}
+
+// ════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════
+fetchMetrics();
+fetchPihole();
+setInterval(fetchMetrics, REFRESH_MS);
+setInterval(fetchPihole, 10000);
+</script>
+
+</body>
+</html>

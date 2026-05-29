@@ -1,3 +1,7 @@
+import re
+import re
+import re
+import re
 # -*- coding: utf-8 -*-
 import requests
 from flask import Flask, jsonify, render_template, request, redirect, url_for, session
@@ -609,10 +613,17 @@ def api_alertas_clear():
     return jsonify({"ok": True})
 
 # --- BUGFIX: faltaba el decorador @app.route('/graficas') ---
-@app.route('/graficas')
+@app.route("/graficas")
+@app.route("/red")
+@app.route("/estadisticas")
 @login_required
-def graficas():
-    return render_template('graficas.html')
+def estadisticas():
+    return render_template("estadisticas.html")
+
+
+
+
+
 
 @app.route('/api/graficas/trafico_total')
 @login_required
@@ -947,6 +958,65 @@ def api_sniffer():
         return jsonify({"ok": False, "error": "Archivo no encontrado"}), 404
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+# ─────────────────────────────────────────────
+#  MONITOR DE RED — /red
+# ─────────────────────────────────────────────
+NODE_EXPORTER_URL = 'http://127.0.0.1:9100/metrics'
+
+
+
+
+@app.route('/api/red/metrics')
+@login_required
+def api_red_metrics():
+    try:
+        resp = requests.get(NODE_EXPORTER_URL, timeout=3)
+        text = resp.text
+
+        def val(pattern):
+            m = re.search(pattern, text, re.MULTILINE)
+            return float(m.group(1)) if m else None
+
+        load1     = val(r'^node_load1\s+([\d.]+)') or 0.0
+        load5     = val(r'^node_load5\s+([\d.]+)') or 0.0
+        mem_total = val(r'^node_memory_MemTotal_bytes\s+([\d.e+]+)') or 0
+        mem_avail = val(r'^node_memory_MemAvailable_bytes\s+([\d.e+]+)') or 0
+        disk_avail = val(r'node_filesystem_avail_bytes\{[^}]*mountpoint="/etc/hostname"[^}]*\}\s+([\d.e+]+)')
+        disk_size  = val(r'node_filesystem_size_bytes\{[^}]*mountpoint="/etc/hostname"[^}]*\}\s+([\d.e+]+)')
+        temp      = val(r'node_thermal_zone_temp\{[^}]*\}\s+([\d.e+]+)')
+        net_rx    = val(r'node_network_receive_bytes_total\{device="wlan0"\}\s+([\d.e+]+)')
+        net_tx    = val(r'node_network_transmit_bytes_total\{device="wlan0"\}\s+([\d.e+]+)')
+
+        ifaces = {}
+        for m in re.finditer(r'node_network_receive_bytes_total\{device="([^"]+)"\}\s+([\d.e+]+)', text):
+            ifaces.setdefault(m.group(1), {})['rx'] = float(m.group(2))
+        for m in re.finditer(r'node_network_transmit_bytes_total\{device="([^"]+)"\}\s+([\d.e+]+)', text):
+            ifaces.setdefault(m.group(1), {})['tx'] = float(m.group(2))
+        interfaces = [{'name': k, 'rx': v.get('rx',0), 'tx': v.get('tx',0)} for k,v in ifaces.items()]
+
+        return jsonify({'ok': True, 'load1': load1, 'load5': load5,
+                        'mem_total': mem_total, 'mem_avail': mem_avail,
+                        'disk_avail': disk_avail, 'disk_size': disk_size,
+                        'temp': temp, 'net_rx': net_rx, 'net_tx': net_tx,
+                        'interfaces': interfaces})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/red/pihole')
+@login_required
+def api_red_pihole():
+    try:
+        r = requests.get(f"{PIHOLE_BASE_URL}/stats/summary", timeout=3,
+                         headers={'X-FTL-SID': current_sid} if current_sid else {})
+        d = r.json()
+        return jsonify({'ok': True,
+                        'queries': d.get('queries',{}).get('total') or d.get('dns_queries_today'),
+                        'blocked': d.get('queries',{}).get('blocked') or d.get('ads_blocked_today'),
+                        'percent': d.get('queries',{}).get('percent_blocked') or d.get('ads_percentage_today'),
+                        'clients': d.get('clients',{}).get('active') or d.get('unique_clients')})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     init_db()
