@@ -364,38 +364,7 @@ docker compose start nginx
 
 ---
 
----
 
-## 📲 Configuración de Notificaciones Telegram
-
-### Paso 1: Crear el bot
-
-1. Abre Telegram y busca **@BotFather**
-2. Envía `/newbot`
-3. Elige un nombre y username
-4. Guarda el **token** que te proporciona
-
-### Paso 2: Obtener Chat ID
-
-```bash
-curl "https://api.telegram.org/botTU_TOKEN/getUpdates"
-```
-
-Busca el campo `"id"` dentro de `"chat"`.
-
-### Paso 3: Configurar .env
-
-```env
-TELEGRAM_TOKEN=tu_token_aqui
-TELEGRAM_CHAT_ID=tu_chat_id_aqui
-```
-
-### Paso 4: Reiniciar
-
-```bash
-cd ~/TFG_deCastro-Ander/pihole
-docker compose restart dashboard
-```
 ## 📁 Estructura del Repositorio
 
 ```
