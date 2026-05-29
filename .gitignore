@@ -1,32 +1,47 @@
+# ── Entorno ──────────────────────────────────────
 .env
+pihole/.env
+pihole/pihole.env
+secretos.txt
+bfg.jar
+.bfg-report/
+
+# ── WireGuard ─────────────────────────────────────
 wireguard_config/wg_confs/
+wireguard_config/templates/
+wireguard_config/server/
 wireguard_config/peer1/
 wireguard_config/peer2/
 wireguard_config/peer3/
-wireguard_config/templates/
-wireguard_config/server/
-pihole/nginx/certs/siem.key
-pihole/etc-pihole/tls.pem
-pihole/.env
+
+# ── Pi-hole ───────────────────────────────────────
 pihole/etc-pihole/gravity.db
 pihole/etc-pihole/gravity_old.db
-pihole/tshark_logs/tshark_capture.txt
-secretos.txt
-pihole/pihole.env
-bfg.jar
-.bfg-report/
-pihole/etc-pihole/pihole-FTL.db*
 pihole/etc-pihole/gravity_backups/
 pihole/etc-pihole/listsCache/
+pihole/etc-pihole/pihole-FTL.db*
 pihole/etc-pihole/cli_pw
+pihole/etc-pihole/tls.pem
 pihole/etc-pihole/tls.crt
 pihole/etc-pihole/tls_ca.crt
 pihole/etc-pihole/versions
 pihole/etc-pihole/logrotate
+pihole/nginx/certs/siem.key
+pihole/tshark_logs/tshark_capture.txt
+
+# ── Grafana ───────────────────────────────────────
 pihole/grafana_data/grafana.db
+
+# ── Dashboard ─────────────────────────────────────
 dashboard/data/
-wireguard_config/peer1/
-wireguard_config/peer2/
-wireguard_config/peer3/
-wireguard_config/server/
-pihole/etc-pihole/cli_pw
+
+# ── mitmproxy ─────────────────────────────────────
+pihole/mitmproxy_data/
+mitmproxy-ca-cert.pem
+
+# ── AdGuard ───────────────────────────────────────
+pihole/adguard-work/
+pihole/adguard-conf/
+pihole/etc-pihole/config_backups/
+pihole/etc-pihole/dnsmasq.conf
+pihole/etc-pihole/pihole.toml

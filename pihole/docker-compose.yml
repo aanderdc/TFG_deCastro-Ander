@@ -153,6 +153,17 @@ services:
       - ../wireguard_config:/config
       - /lib/modules:/lib/modules
     restart: unless-stopped
+  mitmproxy:
+    image: mitmproxy/mitmproxy:latest
+    container_name: mitmproxy
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - ./mitmproxy_data:/home/mitmproxy/.mitmproxy
+    environment:
+      - MITMWEB_PASSWORD=${MITMWEB_PASSWORD}
+    command: >
+      sh -c "mitmweb --web-host 0.0.0.0 --web-port 8081 --listen-port 8080 --no-web-open-browser --set web_password=$$MITMWEB_PASSWORD --mode transparent"
 networks:
   monitoring:
     driver: bridge
