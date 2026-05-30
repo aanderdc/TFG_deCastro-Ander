@@ -168,6 +168,16 @@ services:
       - MITMWEB_PASSWORD=${MITMWEB_PASSWORD}
     command: >
       sh -c "mitmweb --web-host 0.0.0.0 --web-port 8081 --listen-port 8080 --no-web-open-browser --set web_password=$$MITMWEB_PASSWORD --mode transparent"
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: ngrok
+    restart: unless-stopped
+    network_mode: "host"
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command: http https://localhost:443
+    depends_on:
+      - nginx
 networks:
   monitoring:
     driver: bridge
