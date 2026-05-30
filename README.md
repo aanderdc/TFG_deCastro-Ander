@@ -417,7 +417,7 @@ Esta sección describe cómo exponer el dashboard públicamente mediante **ngrok
 > **Resultado final:** acceso al dashboard en una URL pública permanente como `https://xxxx.ngrok-free.dev`, sin tocar el router.
 
 ---
-###HACER DOMINIO PÚBLICO CON NGROK
+### ACCESO EXTERNO: HACER DOMINIO PÚBLICO CON NGROK
 ### Crear cuenta en ngrok
 
 1. Regístrate gratis en [ngrok.com](https://ngrok.com)
@@ -443,7 +443,7 @@ cd pihole
 docker compose up -d ngrok
 ```
 
-### 16.5. Obtener la URL pública
+###Obtener la URL pública
 
 ```bash
 curl http://localhost:4040/api/tunnels | grep public_url
