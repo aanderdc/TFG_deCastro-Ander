@@ -408,6 +408,49 @@ TFG_deCastro-Ander/
 └── wireguard_config/               # Config WireGuard
 ```
 ---
+Aquí tienes el texto para añadir al README. Pégalo después del apartado 15 (DuckDNS):
+
+markdown## 16. Acceso Externo con ngrok (sin abrir puertos)
+
+Esta sección describe cómo exponer el dashboard públicamente mediante **ngrok**, un túnel inverso que no requiere abrir puertos en el router ni configurar redirecciones NAT. Es la opción recomendada cuando no se dispone de IP pública fija o no se tiene acceso a la configuración del router.
+
+> **Resultado final:** acceso al dashboard en una URL pública permanente como `https://xxxx.ngrok-free.dev`, sin tocar el router.
+
+---
+###HACER DOMINIO PÚBLICO CON NGROK
+### Crear cuenta en ngrok
+
+1. Regístrate gratis en [ngrok.com](https://ngrok.com)
+2. Ve a [dashboard.ngrok.com/get-started/your-authtoken](https://dashboard.ngrok.com/get-started/your-authtoken)
+3. Copia tu **authtoken**
+
+---
+
+### Configurar la variable de entorno
+
+Añade el token al archivo `.env`:
+
+```bash
+nano pihole/.env
+```
+NGROK_AUTHTOKEN=tu_authtoken_aqui
+---
+
+### 16.4. Arrancar el servicio
+
+```bash
+cd pihole
+docker compose up -d ngrok
+```
+
+### 16.5. Obtener la URL pública
+
+```bash
+curl http://localhost:4040/api/tunnels | grep public_url
+```
+
+La respuesta mostrará tu URL pública:
+"public_url":"https://xxxx.ngrok-free.dev"
 
 ## 📄 Licencia
 
