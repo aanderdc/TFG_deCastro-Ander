@@ -79,6 +79,7 @@ def init_db():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_trafico_ip ON trafico_dispositivos(ip)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_trafico_fecha ON trafico_dispositivos(fecha_hora)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_lateral_src ON lateral_connections(src_ip, fecha)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_lateral_dst ON lateral_connections(dst_ip, fecha)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_alertas_fecha ON alertas(fecha)')
     
     # WAL mode: mejora la concurrencia entre escrituras y lecturas
@@ -382,8 +383,9 @@ def analizar_trafico_lateral(cursor):
         src = p.get('src', '')
         dst = p.get('dst', '')
 
-        # Solo nos interesan pares donde AMBOS son IPs internas 192.168.x.x
-        if not (src.startswith('192.168.') and dst.startswith('192.168.')):
+        # Solo nos interesan conexiones donde el origen es interno
+        # (incluye salientes al exterior para detección de beaconing)
+        if not src.startswith('192.168.'):
             continue
         # Ignorar la propia Raspberry como origen (su tráfico ya lo vemos)
         # pero SÍ la queremos como destino para detectar escaneos hacia ella
@@ -442,7 +444,63 @@ def analizar_trafico_lateral(cursor):
             f'Conexión lateral a puerto crítico {nombre_proto} ({puerto}): {src_ip} → {dst_ip}',
             'CRITICA')
 
+def detectar_beaconing(cursor):
+    """
+    Detecta beaconing C2: un host interno contacta la misma IP externa
+    con intervalos muy regulares (coeficiente de variación < 0.3).
+    Requiere al menos 5 contactos en la última hora.
+    """
+    import statistics as _stats
+    from datetime import datetime as _dt
 
+    ahora = get_ahora_madrid()
+
+    rows = cursor.execute('''
+        SELECT src_ip, dst_ip, fecha
+        FROM lateral_connections
+        WHERE fecha >= datetime(?, '-1 hour')
+          AND dst_ip NOT LIKE '192.168.%'
+          AND dst_ip NOT LIKE '10.%'
+          AND dst_ip NOT LIKE '172.16.%'
+          AND dst_ip NOT LIKE '172.17.%'
+        ORDER BY src_ip, dst_ip, fecha
+    ''', (ahora,)).fetchall()
+
+    # Agrupar tiempos por par (src, dst)
+    from collections import defaultdict
+    grupos = defaultdict(list)
+    for src, dst, fecha in rows:
+        try:
+            t = _dt.strptime(fecha, "%Y-%m-%d %H:%M:%S")
+            grupos[(src, dst)].append(t)
+        except Exception:
+            pass
+
+    for (src, dst), tiempos in grupos.items():
+        if len(tiempos) < 5:
+            continue
+
+        tiempos.sort()
+        intervalos = [
+            (tiempos[i+1] - tiempos[i]).total_seconds()
+            for i in range(len(tiempos) - 1)
+        ]
+
+        media = sum(intervalos) / len(intervalos)
+        if media < 5:   # descarta ruido (conexiones casi simultáneas)
+            continue
+
+        stdev = _stats.stdev(intervalos) if len(intervalos) > 1 else 0
+        cv = stdev / media  # coeficiente de variación
+
+        if cv < 0.3:
+            severidad = 'CRITICA' if cv < 0.1 else 'ALTA'
+            registrar_alerta(
+                cursor, 'BEACONING', src,
+                f'Posible beaconing C2: {src} → {dst} | '
+                f'{len(tiempos)} contactos en 1h, intervalo ~{media:.0f}s, CV={cv:.2f}',
+                severidad
+            )
 # --- LOGGER DE FONDO ---
 def background_logger():
     ntopng_login()
@@ -476,6 +534,7 @@ def background_logger():
 
             # 3. Análisis de tráfico lateral (tshark) — siempre, independiente de ntopng
             analizar_trafico_lateral(cursor)
+            detectar_beaconing(cursor)
             conn.commit()
 
 
