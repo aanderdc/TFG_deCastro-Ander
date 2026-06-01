@@ -549,6 +549,48 @@ def detectar_doh(cursor):
             registrar_alerta(cursor, 'DNS_OVER_HTTPS', src,
                 f'{src} usa DoH hacia {dst} — Pi-hole bypasado',
                 'ALTA')
+def detectar_ja3(cursor):
+    """
+    Detecta huellas TLS (JA3) asociadas a herramientas C2 conocidas.
+    Lee el CSV generado por el contenedor tshark-ja3.
+    """
+    JA3_C2 = {
+        # Cobalt Strike
+        'e54c6e2fd03f1e2b1c7f8f6e0aefb3a6': 'Cobalt Strike',
+        '72a589da586844d7f0818ce684948eea': 'Cobalt Strike',
+        '6bca5d2a0b7d3d21e06a216c57b7bbfe': 'Cobalt Strike',
+        # Metasploit
+        'c27b06e79a31aff0839438dfff99f4a6': 'Metasploit',
+        'd4d44f04a29f4e18bc49d48de3a88d55': 'Metasploit',
+        # Sliver
+        '5d41402abc4b2a76b9719d911017c592': 'Sliver C2',
+        # Covenant
+        'a0e9f5d64349fb13191bc781f81f42e1': 'Covenant C2',
+    }
+
+    JA3_PATH = '/app/tshark_logs/tshark_ja3.csv'
+    try:
+        with open(JA3_PATH, 'r', errors='replace') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('ip.src'):
+                    continue
+                parts = line.split(',')
+                if len(parts) < 4:
+                    continue
+                src, dst, puerto, ja3 = parts[0], parts[1], parts[2], parts[3]
+                ja3s = parts[4] if len(parts) > 4 else ''
+
+                if ja3 and ja3 in JA3_C2:
+                    herramienta = JA3_C2[ja3]
+                    registrar_alerta(cursor, 'JA3_C2', src,
+                        f'Huella TLS C2 detectada: {herramienta} | '
+                        f'{src} → {dst}:{puerto} | JA3={ja3}',
+                        'CRITICA')
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f'[JA3] Error: {e}')
 # --- LOGGER DE FONDO ---
 def background_logger():
     ntopng_login()
@@ -584,6 +626,7 @@ def background_logger():
             analizar_trafico_lateral(cursor)
             detectar_beaconing(cursor)
             detectar_doh(cursor)
+            detectar_ja3(cursor)
             conn.commit()
 
 

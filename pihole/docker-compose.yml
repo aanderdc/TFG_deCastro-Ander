@@ -178,6 +178,29 @@ services:
     command: http https://localhost:443
     depends_on:
       - nginx
+  tshark-ja3:
+    image: ubuntu:22.04
+    container_name: tshark-ja3
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./tshark_logs:/logs
+    command: >
+      bash -c "DEBIAN_FRONTEND=noninteractive apt-get update -qq &&
+      echo 'wireshark-common wireshark-common/install-setuid boolean true' | debconf-set-selections &&
+      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tshark &&
+      echo 'ip.src,ip.dst,tcp.dstport,tls.handshake.ja3,tls.handshake.ja3s' > /logs/tshark_ja3.csv &&
+      tshark -i wlan0 -s 1600 -l -Y 'tls.handshake.type == 1 or tls.handshake.type == 2'
+      -T fields
+      -e ip.src -e ip.dst -e tcp.dstport
+      -e tls.handshake.ja3 -e tls.handshake.ja3s
+      -E separator=, -E header=n
+      >> /logs/tshark_ja3.csv 2>&1"
+
 networks:
   monitoring:
     driver: bridge
