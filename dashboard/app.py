@@ -527,6 +527,28 @@ def detectar_beaconing(cursor):
                 f'{len(tiempos)} contactos en 1h, intervalo ~{media:.0f}s, CV={cv:.2f}',
                 severidad
             )
+def detectar_doh(cursor):
+    """
+    Detecta uso de DNS over HTTPS (DoH) que bypasea Pi-hole.
+    Busca conexiones al puerto 443 hacia resolvers DoH conocidos.
+    """
+    RESOLVERS_DOH = {
+        '8.8.8.8', '8.8.4.4',       # Google
+        '1.1.1.1', '1.0.0.1',       # Cloudflare
+        '9.9.9.9', '149.112.112.112' # Quad9
+    }
+    ahora = get_ahora_madrid()
+    rows = cursor.execute('''
+        SELECT src_ip, dst_ip, puerto_dst FROM lateral_connections
+        WHERE fecha >= datetime(?, '-10 minutes')
+          AND puerto_dst = '443'
+    ''', (ahora,)).fetchall()
+
+    for src, dst, puerto in rows:
+        if dst in RESOLVERS_DOH:
+            registrar_alerta(cursor, 'DNS_OVER_HTTPS', src,
+                f'{src} usa DoH hacia {dst} — Pi-hole bypasado',
+                'ALTA')
 # --- LOGGER DE FONDO ---
 def background_logger():
     ntopng_login()
@@ -561,6 +583,7 @@ def background_logger():
             # 3. Análisis de tráfico lateral (tshark) — siempre, independiente de ntopng
             analizar_trafico_lateral(cursor)
             detectar_beaconing(cursor)
+            detectar_doh(cursor)
             conn.commit()
 
 
