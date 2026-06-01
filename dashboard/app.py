@@ -213,12 +213,19 @@ def detectar_alertas(cursor, hosts, dns_data=None):
 
     # Media de tráfico por IP en las últimas 24h
     medias = {}
+    RASPY_IP = os.environ.get('RASPBERRY_IP', '192.168.1.147')
     rows = cursor.execute('''
-        SELECT ip, AVG(bytes_bajada) FROM trafico_dispositivos
-        WHERE fecha_hora >= datetime(?, '-24 hours')
-        AND ip LIKE "192.168.%"
-        GROUP BY ip
-    ''', (ahora,)).fetchall()
+        SELECT src_ip, dst_ip, fecha
+        FROM lateral_connections
+        WHERE fecha >= datetime(?, '-1 hour')
+          AND dst_ip NOT LIKE '192.168.%'
+          AND dst_ip NOT LIKE '10.%'
+          AND dst_ip NOT LIKE '172.16.%'
+          AND dst_ip NOT LIKE '172.17.%'
+          AND dst_ip != '224.0.0.1'
+          AND src_ip != ?
+          AND src_ip != '192.168.1.1'
+    ''', (ahora, RASPY_IP)).fetchall()
     for ip, media in rows:
         medias[ip] = media or 0
 
