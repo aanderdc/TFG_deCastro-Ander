@@ -387,6 +387,7 @@ def get_ntopng_hosts():
 # --- DETECCIÓN DE TRÁFICO LATERAL ---
 # Rastrea la última línea procesada para no reprocesar todo el log cada ciclo
 _tshark_last_pos = 0
+_suricata_last_pos = 0
 
 def analizar_trafico_lateral(cursor):
     global _tshark_last_pos  # <-- AQUÍ, primera línea de la función
@@ -591,6 +592,82 @@ def detectar_ja3(cursor):
         pass
     except Exception as e:
         print(f'[JA3] Error: {e}')
+
+def detectar_suricata(cursor):
+    """
+    Lee el eve.json de Suricata y registra alertas en el motor del dashboard.
+    Solo procesa líneas nuevas desde la última posición leída.
+    """
+    global _suricata_last_pos
+    EVE_PATH = '/tshark_logs/../suricata/logs/eve.json'
+    # Ruta real montada en el contenedor
+    EVE_PATHS = [
+    '/suricata/logs/eve.json',
+]
+    eve_path = None
+    for p in EVE_PATHS:
+        if os.path.exists(p):
+            eve_path = p
+            break
+    if not eve_path:
+        return
+
+    try:
+        with open(eve_path, 'r', errors='replace') as f:
+            f.seek(_suricata_last_pos)
+            nuevas = f.readlines()
+            _suricata_last_pos = f.tell()
+    except FileNotFoundError:
+        return
+
+    # Mapeo severidad Suricata (1=crítica, 2=alta, 3=media) → dashboard
+    mapa_severidad = {1: 'CRITICA', 2: 'ALTA', 3: 'MEDIA'}
+
+    # Firmas que ignoramos (falsos positivos conocidos)
+    ignorar = {'duckdns', 'DYNAMIC_DNS', 'Spotify', 'Telegram'}
+
+    for line in nuevas:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            ev = json.loads(line)
+        except Exception:
+            continue
+
+        if ev.get('event_type') != 'alert':
+            continue
+
+        alerta = ev.get('alert', {})
+        signature = alerta.get('signature', '')
+
+        # Ignorar falsos positivos conocidos
+        if any(fp in signature for fp in ignorar):
+            continue
+
+        src_ip = ev.get('src_ip', '')
+        dst_ip = ev.get('dest_ip', '')
+        proto = ev.get('proto', '')
+        dst_port = ev.get('dest_port', '')
+        categoria = alerta.get('category', '')
+        severidad_num = alerta.get('severity', 3)
+        severidad = mapa_severidad.get(severidad_num, 'MEDIA')
+
+        # Enriquecer con MITRE si está disponible
+        mitre = ''
+        metadata = alerta.get('metadata', {})
+        tecnica = metadata.get('mitre_technique_name', [])
+        tactica = metadata.get('mitre_tactic_name', [])
+        if tecnica:
+            mitre = f" | MITRE: {tecnica[0].replace('_', ' ')}"
+
+        descripcion = (
+            f"[Suricata] {signature} | "
+            f"{src_ip} → {dst_ip}:{dst_port} ({proto}){mitre}"
+        )
+
+        registrar_alerta(cursor, 'SURICATA_IDS', src_ip, descripcion, severidad)
+
 # --- LOGGER DE FONDO ---
 def background_logger():
     ntopng_login()
@@ -627,6 +704,7 @@ def background_logger():
             detectar_beaconing(cursor)
             detectar_doh(cursor)
             detectar_ja3(cursor)
+            detectar_suricata(cursor)
             conn.commit()
 
 
@@ -754,14 +832,14 @@ def api_alertas_export_csv():
     ).fetchall()
     conn.close()
     output = io.StringIO()
-    writer = csv.writer(output)
+    writer = csv.writer(output, delimiter='\t')
     writer.writerow(['ID', 'Fecha', 'Tipo', 'IP', 'Descripcion', 'Severidad'])
     writer.writerows(rows)
     output.seek(0)
     return Response(
         output.getvalue(),
-        mimetype='text/csv',
-        headers={"Content-Disposition": "attachment; filename=alertas_siem.csv"}
+        mimetype='text/plain',
+        headers={"Content-Disposition": "attachment; filename=alertas_siem.txt"}
     )
 
 @app.route('/api/csrf-token')
@@ -1194,3 +1272,66 @@ if __name__ == '__main__':
     init_db()
     threading.Thread(target=background_logger, daemon=True).start()
     app.run(host='0.0.0.0', port=5000, debug=False)
+
+#ENDPOINT SURICATA
+@app.route('/api/suricata/alertas')
+@login_required
+def api_suricata_alertas():
+    EVE_PATH = '/suricata/logs/eve.json'
+    ignorar = {'duckdns', 'DYNAMIC_DNS', 'Spotify', 'Telegram'}
+    alertas = []
+    try:
+        with open(EVE_PATH, 'r', errors='replace') as f:
+            for line in f:
+                try:
+                    ev = json.loads(line)
+                    if ev.get('event_type') != 'alert':
+                        continue
+                    sig = ev.get('alert', {}).get('signature', '')
+                    if any(fp in sig for fp in ignorar):
+                        continue
+                    alertas.append({
+                        'timestamp': ev.get('timestamp', '')[:19].replace('T', ' '),
+                        'signature': sig,
+                        'src_ip': ev.get('src_ip', ''),
+                        'dst_ip': ev.get('dest_ip', ''),
+                        'dst_port': ev.get('dest_port', ''),
+                        'categoria': ev.get('alert', {}).get('category', ''),
+                        'severidad_num': ev.get('alert', {}).get('severity', 3),
+                    })
+                except:
+                    continue
+    except FileNotFoundError:
+        pass
+    alertas = alertas[-50:]
+    alertas.reverse()
+    return jsonify({'ok': True, 'alertas': alertas, 'total': len(alertas)})
+
+#ENDPOINT PARA FAIL2BAN
+@app.route('/api/fail2ban/bans')
+@login_required
+def api_fail2ban_bans():
+    import subprocess
+    try:
+        result = subprocess.run(
+            ['docker', 'exec', 'fail2ban', 'fail2ban-client', 'status'],
+            capture_output=True, text=True, timeout=5
+        )
+        jails = []
+        ips = []
+        for line in result.stdout.splitlines():
+            if 'Jail list:' in line:
+                jails = [j.strip() for j in line.split(':')[1].split(',') if j.strip()]
+        for jail in jails:
+            r2 = subprocess.run(
+                ['docker', 'exec', 'fail2ban', 'fail2ban-client', 'status', jail],
+                capture_output=True, text=True, timeout=5
+            )
+            for line in r2.stdout.splitlines():
+                if 'Banned IP list:' in line:
+                    banned = line.split(':')[1].strip()
+                    if banned:
+                        ips.extend(banned.split())
+        return jsonify({'ok': True, 'ips': ips, 'jails': jails, 'total_ips': len(ips)})
+    except Exception as e:
+        return jsonify({'ok': False, 'ips': [], 'jails': [], 'total_ips': 0, 'error': str(e)})

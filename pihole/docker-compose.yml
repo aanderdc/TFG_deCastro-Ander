@@ -127,6 +127,7 @@ services:
       - ../dashboard:/app
       - ./tshark_logs:/tshark_logs
       - ./tshark_logs:/app/tshark_logs
+      - ./suricata/logs:/suricata/logs
     environment:
       - DOCKER_HOST=tcp://127.0.0.1:2375
     working_dir: /app
