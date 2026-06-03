@@ -201,6 +201,38 @@ services:
       -e tls.handshake.ja3 -e tls.handshake.ja3s
       -E separator=, -E header=n
       >> /logs/tshark_ja3.csv 2>&1"
+  suricata:
+    image: jasonish/suricata:latest
+    container_name: suricata
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_NICE
+    volumes:
+      - ./suricata/rules:/var/lib/suricata/rules
+      - ./suricata/logs:/var/log/suricata
+    command: suricata -i wlan0 --init-errors-fatal
+
+  fail2ban:
+    image: crazymax/fail2ban:latest
+    container_name: fail2ban
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      - TZ=Europe/Madrid
+      - F2B_LOG_LEVEL=INFO
+    volumes:
+      - ./fail2ban/jail.d:/data/jail.d
+      - ./fail2ban/filter.d:/data/filter.d
+      - /var/log:/var/log:ro
+      - /etc/localtime:/etc/localtime:ro
 
 networks:
   monitoring:

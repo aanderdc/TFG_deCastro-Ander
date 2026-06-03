@@ -48,3 +48,5 @@ pihole/etc-pihole/pihole.toml
 pihole/etc-pihole/config_backups/
 pihole/etc-pihole/dnsmasq.conf
 pihole/etc-pihole/pihole.toml
+pihole/suricata/logs/
+pihole/suricata/rules/
