@@ -1,468 +1,335 @@
-# 🛡️ Sistema de Monitorización y Gestión de Red de bajo coste para entorno PYME
+# 🛡️ Sistema de Monitorización y Gestión de Red de bajo coste para entorno PYME— TFG
 
-**TFG — Grado en Ingeniería en Tecnología de Telecomunicación**  
-**Autor:** Ander de Castro  
+**Grado en Ingeniería en Tecnología de Telecomunicación**  
+**Autor:** Ander de Castro · Raspberry Pi 4 · Código abierto
 
 ---
 
-## 📋 Inicio Rápido
+## ¿Qué es esto?
 
-### Requisitos Mínimos
-- Raspberry Pi 4 (4 GB RAM recomendados) — ~60-70 €
-- Tarjeta microSD 16+ GB
-- Cable Ethernet + ordenador para configuración inicial
-- Docker & Docker Compose preinstalados
+Sistema de monitorización de red de bajo coste para entornos PYMES, desplegado sobre una Raspberry Pi 4. Integra filtrado DNS, análisis de tráfico, detección de amenazas y un dashboard web propio.
 
-### En 5 pasos
+**Funciones principales:**
+- Filtrado DNS preventivo con bloqueo de dominios maliciosos
+- Análisis de flujos TCP/UDP en tiempo real (ntopng)
+- Captura de paquetes y detección de tráfico lateral (Tshark)
+- Motor de alertas con reglas heurísticas
+- Dashboard web unificado con gráficas históricas
+- Notificaciones automáticas por Telegram
+- Acceso remoto seguro por VPN (WireGuard)
+
+---
+
+## 🚀 Despliegue rápido
+
+### Requisitos
+- Raspberry Pi 4 (4 GB RAM recomendados)
+- Tarjeta microSD 16+ GB o disco duro
+- Docker instalado
 
 ```bash
-# 1. Clonar y configurar
-git clone https://github.com/aanderdc/TFG_deCastro-Ander.git
-cd TFG_deCastro-Ander/pihole
-cp .env.example .env && nano .env
-
-# 2. Desplegar
-docker compose up -d
-
-# 3. Verificar
-docker ps  # Deberías ver 12 contenedores activos
-
-# 4. Configurar DNS en router
-# Cambia DNS primario a IP_RASPBERRY
-
-# 5. Acceder
-# https://IP_RASPBERRY
-```
-
----
-
-## 🎯 Descripción del Proyecto
-
-Sistema de **monitorización y gestión de red** basado en **Raspberry Pi 4** y herramientas de código abierto, orientado a PYMES con presupuesto limitado.
-
-### Funciones principales:
-- ✅ Filtrado DNS preventivo de **dominios maliciosos**
-- ✅ Análisis de flujos TCP/UDP en tiempo real
-- ✅ Motor de alertas inteligente (6 reglas heurísticas)
-- ✅ Dashboard unificado con gráficas históricas
-- ✅ Detección de escaneos internos y movimiento lateral
-- ✅ Panel de control de contenedores Docker
-- ✅ Notificaciones automáticas por Telegram
-- ✅ Acceso remoto seguro via VPN (WireGuard)
-- ✅ Certificados TLS con Let's Encrypt
-
----
-
-## ⚡ Instalación Rápida
-
-### Requisitos Previos
-
-```bash
-# Instalar Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
+# Instalar Docker si no lo tienes
+curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker $USER
-
-# Desconecta y vuelve a conectar SSH
 ```
 
-### Despliegue
-
-```bash
-# 1. Clonar repositorio
-git clone https://github.com/aanderdc/TFG_deCastro-Ander.git
-cd TFG_deCastro-Ander
-
-# 2. Configurar credenciales
-cp pihole/.env.example pihole/.env
-nano pihole/.env
-# 👉 Edita todos los valores marcados
-
-# 3. Iniciar servicios
-cd pihole
-docker compose up -d
-
-# 4. Verificar
-docker ps
-
-# 5. Acceder
-# https://IP_DE_TU_RASPBERRY
-```
-
----
-
-
-## 📲 Configuración de Notificaciones Telegram
-
-### Paso 1: Crear el bot
-
-1. Abre Telegram y busca **@BotFather**
-2. Envía `/newbot`
-3. Elige un nombre y username
-4. Guarda el **token** que te proporciona
-
-### Paso 2: Obtener Chat ID
-
-```bash
-curl "https://api.telegram.org/botTU_TOKEN/getUpdates"
-```
-
-Busca el campo `"id"` dentro de `"chat"`.
-
-### Paso 3: Configurar .env
-
-```env
-TELEGRAM_TOKEN=tu_token_aqui
-TELEGRAM_CHAT_ID=tu_chat_id_aqui
-```
-
-### Paso 4: Reiniciar
-
-```bash
-cd ~/TFG_deCastro-Ander/pihole
-docker compose restart dashboard
-```
-
-### Alertas que generan notificación
-
-| Regla | Severidad | Notifica |
-|-------|-----------|----------|
-| Threat Score > 500 | 🔴 CRÍTICA | ✅ |
-| LATERAL_PORT (RDP/SMB/SSH) | 🔴 CRÍTICA | ✅ |
-| Nueva IP detectada | 🟠 ALTA | ✅ |
-| Pico de tráfico 5x | 🟠 ALTA | ✅ |
-| LATERAL_SCAN ≥ 15 IPs | 🔴 CRÍTICA | ✅ |
-
----
-
-## 👥 Guía de Usuario
-
-### Paso 1: Flashear SO
-
-1. Descarga **[Raspberry Pi Imager](https://www.raspberrypi.com/software/)**
-2. Inserta la microSD
-3. Selecciona: **Raspberry Pi 4** + **Raspberry Pi OS (64-bit)**
-4. Clic en **Escribir** y espera
-
-### Paso 2: SSH
-
-```bash
-ssh pi@raspberrypi.local
-# Contraseña: raspberry
-```
-
-### Paso 3: Docker
-
-```bash
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-sudo usermod -aG docker $USER
-# Reconectar SSH
-```
-
-### Paso 4: Clonar y Configurar
+### Instalación
 
 ```bash
 git clone https://github.com/aanderdc/TFG_deCastro-Ander.git
 cd TFG_deCastro-Ander/pihole
 cp .env.example .env
-nano .env
-# Editar campos (Ctrl+O → Enter → Ctrl+X)
-```
-
-### Paso 5: Lanzar
-
-```bash
+nano .env        # Edita contraseñas e IPs
 docker compose up -d
-docker ps  # Verificar 12 contenedores
+docker ps        # Verifica que los contenedores están UP
 ```
 
-### Paso 6: DNS en Router
+### Configurar DNS en el router
+Cambia el **DNS primario** de tu router a la IP de la Raspberry (ej: `192.168.1.100`).
 
-1. Abre `192.168.1.1` en navegador
-2. Inicia sesión
-3. Busca **DHCP** o **DNS**
-4. Cambia **DNS primario** a la IP de tu Raspberry
-5. Guarda y reinicia
-
-### Paso 7: Dashboard
-
-Abre `https://IP_DE_TU_RASPBERRY` - Acepta el certificado
+### Acceder al dashboard
+Abre `https://IP_DE_TU_RASPBERRY` en el navegador. Acepta el aviso de certificado.
 
 ---
 
-## 🎨 Funcionalidades del Dashboard
+## 🗂️ Acceso a los servicios
 
-### Vistas Principales
+| Servicio | URL | Credenciales |
+|----------|-----|--------------|
+| **Dashboard (SIEM)** | `https://IP` | `DASHBOARD_USER` / `DASHBOARD_PASSWORD` |
+| **Pi-hole** | `http://IP:80` | `PIHOLE_PASSWORD` |
+| **Grafana** | `http://IP:3000` | `admin` / `GRAFANA_PASSWORD` |
+| **ntopng** | `http://IP:3001` | `admin` / `NTOPNG_PASSWORD` |
+| **WireGuard** | `IP:51820/UDP` | Certificados de cliente |
 
-#### 1. 📊 Dashboard Principal
-- Métricas DNS en tiempo real
-- Dispositivos activos en la red
-- Consumo de ancho de banda
-- Alertas recientes con severidad
-- Estado de servicios críticos
-
-#### 2. 📡 Sniffer
-- Análisis de paquetes HTTP/DNS en tiempo real
-- Filtrado por dominio, IP, puerto
-- Detalles de transacciones
-
-#### 3. 📊 Estadísticas
-- Gráficas históricas (6h, 24h, 48h, 7 días)
-- Consultas DNS bloqueadas
-- Tráfico por dispositivo
-
-#### 4. 📈 Gráficas
-- Embedidas de Grafana
-- Series temporales
-
-#### 5. ⚠️ Alertas (`alertas.html`)
-- 6 reglas de detección automática
-- Severidad: Crítica, Alta, Media, Baja
-- Exportación a CSV
-
-#### 6. 🗺️ Red
-- Mapa visual de conexiones
-- Detección de escaneos internos
-- Análisis de movimiento lateral
-
-#### 7. 🐳 Docker
-- Estado de los 12 contenedores
-- Logs en tiempo real
-- Botones: Iniciar/Parar/Reiniciar
-
-### 6 Reglas del Motor de Alertas
-
-| Regla | Condición | Severidad |
-|-------|-----------|-----------|
-| **Threat Score** | ntopng > 100 (crítico > 500) | CRÍTICA |
-| **Nueva IP** | Dispositivo no visto | ALTA |
-| **Pico tráfico** | 5x la media 24h | ALTA |
-| **Bloqueos DNS** | >50 dominios en 30s | MEDIA |
-| **LATERAL_SCAN** | >5 IPs internas en 30s | ALTA |
-| **LATERAL_PORT** | Conexión RDP/SMB/SSH/Telnet/VNC | CRÍTICA |
+> Prometheus, Node Exporter y pihole-exporter están restringidos a `localhost`.
 
 ---
 
-## 🔐 Políticas de Seguridad
+## 📲 Configurar notificaciones Telegram
 
-**DNS Blocklists:**
-- **Hagezi Multi Pro** — Telemetría, rastreadores, malware, C2
-- **StevenBlack/hosts** — Publicidad y trackers
+### 1. Crear el bot
+1. Abre Telegram y busca **@BotFather**
+2. Envía `/newbot` y sigue las instrucciones
+3. Guarda el **token** que te dará BotFather
 
-Listas Hagezi: https://github.com/hagezi/dns-blocklists
-
----
-
-## ❌ Solución de Problemas
-
-### Contenedor aparece "Exited"
+### 2. Obtener tu Chat ID
+Envía cualquier mensaje a tu bot y ejecuta:
 ```bash
-docker logs nombre_contenedor
-docker compose restart nombre_contenedor
+curl "https://api.telegram.org/botTU_TOKEN/getUpdates"
+```
+Busca el campo `"id"` dentro de `"chat"`.
+
+### 3. Configurar el .env
+```bash
+nano ~/TFG_deCastro-Ander/pihole/.env
+```
+```env
+TELEGRAM_TOKEN=tu_token_aqui
+TELEGRAM_CHAT_ID=tu_chat_id_aqui
 ```
 
-### No puedo acceder al dashboard
-- ¿Estás en la misma red que la Raspberry?
-- ¿El navegador muestra advertencia de certificado? (normal, acepta)
-
-### Pi-hole no bloquea nada
+### 4. Reiniciar el dashboard
 ```bash
-nslookup google.com 192.168.1.X
+cd ~/TFG_deCastro-Ander/pihole
+docker compose restart dashboard
+docker exec mi_dashboard env | grep TELEGRAM  # Verificar
 ```
 
-### ntopng no conecta con Redis
-La sintaxis debe ser: `127.0.0.1:6379:${REDIS_PASSWORD}@0`
+---
 
-### Docker Socket Proxy — error 403
-Añade `IMAGES=1` a las variables de entorno del servicio `docker-proxy`.
+## ⚠️ Motor de alertas
 
-### Contraseña Redis con caracteres especiales
-⚠️ **Usa solo alfanuméricos.** Caracteres como `!` `@` `#` causan problemas.
+| Regla | Condición | Severidad | Telegram |
+|-------|-----------|-----------|----------|
+| `SCORE_ALTO` | ntopng score > 100 (crítico > 500) | CRÍTICA/ALTA | 
+| `DISPOSITIVO_NUEVO` | IP no vista anteriormente | MEDIA | 
+| `TRAFICO_ALTO` | Bajada > 5x media 24h y > 10MB | ALTA | 
+| `DNS_BLOQUEADAS` | > 50 dominios bloqueados en 30s | ALTA | 
+| `FLOOD_DETECTADO` | > 500 flows activos desde una IP | CRÍTICA/ALTA | 
+| `RATIO_ANOMALO` | Subida/bajada > 10x y subida > 50MB | ALTA | 
+| `LATERAL_SCAN` | > 5 IPs internas contactadas en 30s | CRÍTICA/ALTA | 
+| `LATERAL_PORT` | Conexión a RDP/SMB/SSH/Telnet/VNC | CRÍTICA | 
+| `BEACONING` | Contacto regular a IP externa (CV < 0.3) | CRÍTICA/ALTA | 
+| `DNS_OVER_HTTPS` | Conexión a resolver DoH conocido (puerto 443) | ALTA | 
+| `JA3_C2` | Huella TLS asociada a Cobalt Strike/Metasploit/Sliver | CRÍTICA | 
+Puede que se añadan más en siguientes versiones
+---
+
+## 🏗️ Arquitectura
+
+```
+INTERNET
+    │
+    ▼
+┌─────────────┐
+│   ROUTER    │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────────────────────────┐
+│       RASPBERRY PI 4            │
+│                                 │
+│  Pi-hole      → Filtrado DNS    │
+│  ntopng       → Flujos L7       │
+│  Tshark       → Captura paquetes│
+│  Flask SIEM   → Dashboard web   │
+│  Prometheus   → Métricas HW     │
+│  Grafana      → Visualización   │
+│  WireGuard    → VPN remota      │
+│  Nginx        → Proxy TLS       |
+|  Más contenedores.....          │
+└─────────────────────────────────┘
+```
+
+## 🛠️ Stack completo
+
+| Servicio | Imagen | Función |
+|----------|--------|---------|
+| Pi-hole | `pihole/pihole:latest` | Filtrado DNS |
+| ntopng | `ntop/ntopng_arm64.dev:latest` | Análisis flujos |
+| Tshark | `ubuntu:22.04` | Captura paquetes |
+| Tshark-JA3 | `ubuntu:22.04` | Huellas TLS |
+| Flask | `python:3.9-slim` | Dashboard + alertas |
+| Grafana | `grafana/grafana-oss:latest` | Gráficas históricas |
+| Prometheus | `prom/prometheus:latest` | Series temporales |
+| Node Exporter | `prom/node-exporter:latest` | Métricas SO |
+| pihole-exporter | `ekofr/pihole-exporter:latest` | Bridge Pi-hole→Prometheus |
+| Redis | `redis:alpine` | Caché ntopng |
+| Nginx | `nginx:alpine` | Proxy inverso TLS |
+| WireGuard | `linuxserver/wireguard:latest` | VPN |
+| Docker Proxy | `tecnativa/docker-socket-proxy` | Acceso seguro Docker API |
+
+> Los servicios `prometheus`, `pihole-exporter`, `grafana` y `mitmproxy` son opcionales (`profiles: ["opcional"]`), consumen recursos excesivos, pero se pueden encender desde el dashboard.
 
 ---
 
-## 🌐 Visibilidad de Red
+## 🌐 Visibilidad de red
 
-### El Problema
+ntopng y Tshark capturan el tráfico que **pasa por la Raspberry**. El tráfico lateral entre dispositivos no es visible por defecto.
 
-ntopng y tshark capturan tráfico que **pasa por la Raspberry**. El tráfico lateral (PC ↔ Servidor) **no se ve**.
+**Soluciones para visibilidad total:**
 
-### Lo que SÍ detectamos
-- ✅ Entradas maliciosas (bloqueadas por Pi-hole)
-- ✅ Contacto con C2 (puntuación ntopng)
-- ✅ Escaneos internos (LATERAL_SCAN)
-- ✅ Conexiones a puertos críticos (LATERAL_PORT)
+| Opción | Coste | Dificultad |
+|--------|-------|-----------|
+| Port Mirroring en router | 0 € | Baja |
+| Switch gestionable (SPAN) | ~25-35 € | Baja |
+| Raspberry como gateway | ~25 € | Media |
 
-### Soluciones
-
-| Opción | Coste | Dificultad | Visibilidad |
-|--------|-------|-----------|-------------|
-| **Port Mirroring (SPAN)** | 0 € | Baja | Total |
-| **Raspberry como gateway** | ~25 € | Media | Total |
-| **Switch gestionable** | ~30 € | Baja | Total |
-| **Arquitectura actual** | 0 € | — | Parcial |
-
-### Switches recomendados (SPAN)
-- TP-Link TL-SG105E (~25 €)
-- Netgear GS305E (~30 €)
-- TP-Link TL-SG108E (~35 €)
-
+**Switches recomendados:** TP-Link TL-SG105E (~25€), Netgear GS305E (~30€)
+---
+ 
+## 🔗 Acceso externo rápido: ngrok
+ 
+ngrok permite exponer el dashboard a internet en segundos, sin necesidad de configurar DNS ni abrir puertos en el router. Útil para pruebas o acceso puntual.
+ 
+> ⚠️ **Advertencia:** ngrok expone el dashboard públicamente. Asegúrate de tener configuradas contraseñas fuertes en el `.env` antes de activarlo.
+ 
+### 1. Crear cuenta y obtener token
+ 
+1. Regístrate en [https://dashboard.ngrok.com](https://dashboard.ngrok.com)
+2. Ve a **Your Authtoken** y copia el token
+### 2. Configurar el .env
+ 
+```bash
+nano ~/TFG_deCastro-Ander/pihole/.env
+```
+```env
+NGROK_AUTHTOKEN=tu_token_aqui
+```
+ 
+### 3. Arrancar ngrok
+ 
+ngrok está configurado como servicio opcional. Para activarlo:
+ 
+```bash
+cd ~/TFG_deCastro-Ander/pihole
+docker compose --profile opcional up -d ngrok
+```
+ 
+### 4. Obtener la URL pública
+ 
+```bash
+docker logs ngrok 2>&1 | grep "url="
+# O accede a http://127.0.0.1:4040 desde la Raspberry para ver el panel de ngrok
+```
+ 
+La URL tendrá el formato `https://xxxx-xx-xx-xxx-xx.ngrok-free.app`.
+ 
+### 5. Parar ngrok cuando no lo necesites
+ 
+```bash
+docker compose stop ngrok
+```
+ 
+> Para acceso externo permanente se recomienda usar **DuckDNS + Let's Encrypt** (sección siguiente), que no depende de terceros y no expone el servicio públicamente.
+ 
 ---
 
-## 🌍 Acceso Externo: DuckDNS + Let's Encrypt
-
-### 1. Crear dominio DuckDNS
-
-Ve a https://www.duckdns.org - Inicia sesión - Crea subdominio - Guarda TOKEN
-
-### 2. Script de actualización DNS
+## 🌍 Acceso externo: DuckDNS + Let's Encrypt
 
 ```bash
+# 1. Crear dominio en https://www.duckdns.org
+
+# 2. Script de actualización DNS automática
 mkdir -p ~/duckdns
 cat > ~/duckdns/duck.sh << 'EOF'
-echo url="https://www.duckdns.org/update?domains=TU_DOMINIO&token=TU_TOKEN&ip=" | \
-  curl -k -o ~/duckdns/duck.log -K -
+echo url="https://www.duckdns.org/update?domains=TU_DOMINIO&token=TU_TOKEN&ip=" | curl -k -o ~/duckdns/duck.log -K -
 EOF
 chmod +x ~/duckdns/duck.sh
+# Añadir a crontab: */5 * * * * ~/duckdns/duck.sh >/dev/null 2>&1
 
-# Automatizar cada 5 minutos
-crontab -e
-# */5 * * * * ~/duckdns/duck.sh >/dev/null 2>&1
-```
-
-### 3. Obtener certificado Let's Encrypt
-
-```bash
-sudo apt update && sudo apt install certbot -y
-cd ~/TFG_deCastro-Ander/pihole
+# 3. Certificado Let's Encrypt
+sudo apt install certbot -y
 docker compose stop nginx
+sudo certbot certonly --standalone -d tunombre.duckdns.org --email tu@email.com --agree-tos --non-interactive
 
-sudo certbot certonly --standalone --preferred-challenges http \
-  -d tunombre.duckdns.org --email tu@email.com --agree-tos --non-interactive
-```
-
-### 4. Configurar Nginx
-
-```bash
-sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/fullchain.pem \
-  ~/TFG_deCastro-Ander/pihole/nginx/certs/fullchain.pem
-sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/privkey.pem \
-  ~/TFG_deCastro-Ander/pihole/nginx/certs/privkey.pem
-sudo chmod 644 ~/TFG_deCastro-Ander/pihole/nginx/certs/*.pem
+# 4. Copiar certificados
+sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/fullchain.pem pihole/nginx/certs/
+sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/privkey.pem pihole/nginx/certs/
 docker compose start nginx
 ```
 
-### 5. Renovación automática
+---
 
-```bash
-0 3 * * 1 sudo certbot renew --quiet && \
-  sudo cp /etc/letsencrypt/live/tunombre.duckdns.org/fullchain.pem \
-  ~/TFG_deCastro-Ander/pihole/nginx/certs/fullchain.pem && \
-  docker restart nginx-siem
-```
+## 🔒 Seguridad aplicada
+
+| Componente | Medida |
+|------------|--------|
+| Credenciales | Variables de entorno (`.env`) |
+| Acceso web | TLS obligatorio (Nginx) |
+| Acceso remoto | VPN WireGuard |
+| Docker API | Socket Proxy (acceso restringido) |
+| Métricas | Restringidas a `localhost` |
+| Redis | Autenticación obligatoria |
+| Login dashboard | Rate limiting + CSRF token |
+| Sesiones | Expiración 24h |
 
 ---
 
+## ❌ Solución de problemas
 
-## 📁 Estructura del Repositorio
+**Contenedor en "Exited":**
+```bash
+docker logs nombre_contenedor
+```
+
+**Dashboard no accesible:**
+- Verifica que estás en la misma red que la Raspberry
+- El aviso de certificado es normal, acéptalo
+
+**Pi-hole no bloquea:**
+```bash
+# Verifica que el DNS del router apunta a la Raspberry
+nslookup google.com IP_RASPBERRY
+```
+
+**Variables de entorno no cargadas:**
+```bash
+docker exec mi_dashboard env | grep DASHBOARD
+# Si están vacías:
+docker compose up -d --force-recreate dashboard
+```
+
+**Grafana sin permisos:**
+```bash
+sudo chown -R 472:472 ~/TFG_deCastro-Ander/pihole/grafana_data
+docker compose restart grafana
+```
+
+**Redis con caracteres especiales en contraseña:**
+Usa solo caracteres alfanuméricos en `REDIS_PASSWORD`.
+
+---
+
+## ⚡ Eficiencia energética
+
+| Condición | Consumo |
+|-----------|---------|
+| Baja carga | ~3-5 W |
+| Carga sostenida | ~7-8 W |
+| Coste anual (24/7) | < 20 € |
+
+---
+
+## 📁 Estructura del repositorio
 
 ```
 TFG_deCastro-Ander/
 ├── pihole/
-│   ├── docker-compose.yml          # 12 microservicios
-│   │   ├── pihole                  # DNS + admin
-│   │   ├── redis                   # Cache (autenticado)
-│   │   ├── ntopng                  # Flujos (login requerido)
-│   │   ├── tshark-sflow            # Captura paquetes
-│   │   ├── nginx                   # Proxy + TLS
-│   │   ├── docker-proxy            # Socket proxy
-│   │   ├── dashboard               # Flask SIEM
-│   │   ├── wireguard               # VPN (3 peers)
-│   │   ├── node-exporter           # Telemetría
-│   │   ├── prometheus              # Métricas
-│   │   ├── pihole-exporter         # Exportador
-│   │   ├── grafana                 # Visualización
-│   │   └── mitmproxy               # Opcional
-│   ├── .env.example                # Template credenciales
-│   ├── prometheus.yml              # Scraping
-│   ├── nginx/
-│   │   ├── siem.conf              # Config proxy
-│   │   └── certs/                 # Certificados TLS
-│   └── grafana_data/              # Persistencia
+│   ├── docker-compose.yml     # Orquestación de servicios
+│   ├── .env.example           # Plantilla de credenciales
+│   ├── prometheus.yml         # Configuración de métricas
+│   └── nginx/                 # Proxy inverso + certificados TLS
 ├── dashboard/
-│   ├── app.py                      # Backend Flask
-│   ├── alerter.py                  # Motor alertas
-│   ├── templates/
-│   │   ├── index.html             # Dashboard principal
-│   │   ├── sniffer.html           # Captura viva
-│   │   ├── estadisticas.html      # Análisis avanzado
-│   │   ├── graficas.html          # Grafana embed
-│   │   ├── alertas.html           # Centro alertas
-│   │   ├── lateral.html           # Red interna
-│   │   ├── red.html               # Red mejorada
-│   │   ├── contenedores.html      # Docker control
-│   │   └── login.html             # Autenticación
-│   ├── static/                     # CSS, JS, assets
-│   └── requirements.txt            # Dependencias Python
-└── wireguard_config/               # Config WireGuard
-```
----
-Aquí tienes el texto para añadir al README. Pégalo después del apartado 15 (DuckDNS):
-
-markdown## 16. Acceso Externo con ngrok (sin abrir puertos)
-
-Esta sección describe cómo exponer el dashboard públicamente mediante **ngrok**, un túnel inverso que no requiere abrir puertos en el router ni configurar redirecciones NAT. Es la opción recomendada cuando no se dispone de IP pública fija o no se tiene acceso a la configuración del router.
-
-> **Resultado final:** acceso al dashboard en una URL pública permanente como `https://xxxx.ngrok-free.dev`, sin tocar el router.
-
----
-### ACCESO EXTERNO: HACER DOMINIO PÚBLICO CON NGROK
-### Crear cuenta en ngrok
-
-1. Regístrate gratis en [ngrok.com](https://ngrok.com)
-2. Ve a [dashboard.ngrok.com/get-started/your-authtoken](https://dashboard.ngrok.com/get-started/your-authtoken)
-3. Copia tu **authtoken**
-
----
-
-### Configurar la variable de entorno
-
-Añade el token al archivo `.env`:
-
-```bash
-nano pihole/.env
-```
-NGROK_AUTHTOKEN=tu_authtoken_aqui
----
-
-### 16.4. Arrancar el servicio
-
-```bash
-cd pihole
-docker compose up -d ngrok
+│   ├── app.py                 # Backend Flask + motor de alertas
+│   └── templates/             # Vistas HTML del dashboard
+└── wireguard_config/          # Configuración VPN (excluida del repo)
 ```
 
-###Obtener la URL pública
-
-```bash
-curl http://localhost:4040/api/tunnels | grep public_url
-```
-
-La respuesta mostrará tu URL pública:
-"public_url":"https://xxxx.ngrok-free.dev"
+---
 
 ## 📄 Licencia
 
 Proyecto académico — Trabajo de Fin de Grado.  
-
----
-
-## 🤝 Soporte
-
-Para preguntas o problemas:
-1. Revisa [Solución de Problemas](#-solución-de-problemas-frecuentes)
-2. Abre una **Issue** en GitHub con detalles del error
-
-**Última actualización:** 29 de Mayo de 2026  
-**Versión:** 1.0
+Alineado con ODS 4 (Educación de Calidad) y ODS 9 (Industria, Innovación e Infraestructura).
