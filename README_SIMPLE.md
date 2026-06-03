@@ -333,7 +333,7 @@ Esto muestra el error. Ejemplos comunes:
 
 El sistema te avisará cuando vea algo raro:
 
-| Alerta | Significado | ¿Es grave? | Qué hacer |
+| Ej. Alerta | Significado | ¿Es grave? | Qué hacer |
 |---|---|---|---|
 | 🟢 **Dispositivo nuevo** | Se conectó un móvil/ordenador que no habíamos visto | ℹ️ Informativo | Nada, es normal |
 | 🟠 **Tráfico inusual** | Se descarga MUCHO más de lo normal | ⚠️ Aviso | Revisa qué dispositivo |
@@ -401,30 +401,3 @@ docker compose restart mi_dashboard
   ```
 
 ---
-
-## 📞 PREGUNTAS FRECUENTES
-
-### ❓ "¿Necesito conocimientos de Linux?"
-No, esta guía es paso a paso. Solo necesitas copiar y pegar comandos.
-
-### ❓ "¿Se puede perder la red?"
-No, si algo falla, los ordenadores seguirán conectados (solo sin protección). Es muy seguro.
-
-### ❓ "¿Puedo añadir más dispositivos después?"
-Sí, se detectan automáticamente. No hay que tocar nada más.
-
-### ❓ "¿Qué pasa si apago la Raspberry?"
-Todo sigue funcionando, solo sin protección DNS. Se reinicia automáticamente si vuelves a enchufar.
-
-### ❓ "¿Es fácil de mover a otro lugar?"
-Sí, solo apaga, transporta y enchufa en otro sitio. Funciona automáticamente.
-
-### ❓ "¿Cuántos dispositivos puede vigilar?"
-Hasta 200-300 dispositivos sin problema. Más que eso requiere hardware mejor.
-
-### ❓ "¿Puede hackearse?"
-Es muy difícil. Está protegido con autenticación y cifrado. Más seguro que un router normal.
-
-### ❓ "¿Qué pasa con mi privacidad?"
-Los datos se guardan SOLO en tu Raspberry Pi. No se envía nada a internet (salvo si configuras Telegram).
-
