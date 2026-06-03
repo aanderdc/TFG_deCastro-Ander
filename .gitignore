@@ -64,3 +64,14 @@ pihole/tshark_logs/tshark_capture.old
 
 # ── ntopng ────────────────────────────────────────
 pihole/ntopng_redis/
+
+# ── Python cache ──────────────────────────────────
+dashboard/__pycache__/
+**/__pycache__/
+*.pyc
+
+# ── Nginx logs ────────────────────────────────────
+pihole/nginx/logs/
+
+# ── Archivos temporales ───────────────────────────
+dashboard/LA_RUTA_QUE_SALGA_ARRIBA
