@@ -113,7 +113,7 @@ docker exec mi_dashboard env | grep TELEGRAM  # Verificar
 | `BEACONING` | Contacto regular a IP externa (CV < 0.3) | CRÍTICA/ALTA | 
 | `DNS_OVER_HTTPS` | Conexión a resolver DoH conocido (puerto 443) | ALTA | 
 | `JA3_C2` | Huella TLS asociada a Cobalt Strike/Metasploit/Sliver | CRÍTICA | 
-Puede que se añadan más en siguientes versiones
+Puede que se añadan más en siguientes versiones.
 ---
 
 ## 🏗️ Arquitectura
@@ -173,10 +173,10 @@ ntopng y Tshark capturan el tráfico que **pasa por la Raspberry**. El tráfico 
 | Opción | Coste | Dificultad |
 |--------|-------|-----------|
 | Port Mirroring en router | 0 € | Baja |
-| Switch gestionable (SPAN) | ~25-35 € | Baja |
-| Raspberry como gateway | ~25 € | Media |
+| Switch gestionable (SPAN) | desde 30 € | Baja |
+| Raspberry como gateway (ej: con adaptador USB-Ethernet) | ~20 € | Media |
 
-**Switches recomendados:** TP-Link TL-SG105E (~25€), Netgear GS305E (~30€)
+**Switches baratos:** TP-Link TL-SG105E (~25€), Netgear GS305E (~30€)
 ---
  
 ## 🔗 Acceso externo rápido: ngrok
@@ -299,16 +299,6 @@ docker compose restart grafana
 
 **Redis con caracteres especiales en contraseña:**
 Usa solo caracteres alfanuméricos en `REDIS_PASSWORD`.
-
----
-
-## ⚡ Eficiencia energética
-
-| Condición | Consumo |
-|-----------|---------|
-| Baja carga | ~3-5 W |
-| Carga sostenida | ~7-8 W |
-| Coste anual (24/7) | < 20 € |
 
 ---
 
