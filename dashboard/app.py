@@ -658,8 +658,10 @@ def detectar_suricata(cursor):
 # --- LOGGER DE FONDO ---
 def background_logger():
     ntopng_login()
+    ciclos_sin_limpieza = 0          # cada 120 ciclos × 30s = 1 hora
     while True:
         try:
+            ciclos_sin_limpieza += 1
             ahora = get_ahora_madrid()
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
@@ -677,10 +679,14 @@ def background_logger():
                 conn.commit()
                 detectar_alertas(cursor, hosts)
                 # Limpieza automatica de datos antiguos (retencion 30 dias)
-                cursor.execute("DELETE FROM trafico_dispositivos WHERE fecha_hora < datetime('now', '-30 days')")
-                cursor.execute("DELETE FROM estadisticas_dns WHERE fecha < datetime('now', '-30 days')")
-                cursor.execute("DELETE FROM lateral_connections WHERE fecha < datetime('now', '-30 days')")
-                cursor.execute("DELETE FROM alertas WHERE fecha < datetime('now', '-90 days')")
+                # Limpieza de datos antiguos — solo 1 vez por hora (cada 120 ciclos de 30s)
+                if ciclos_sin_limpieza >= 120:
+                    cursor.execute("DELETE FROM trafico_dispositivos WHERE fecha_hora < datetime('now', '-30 days')")
+                    cursor.execute("DELETE FROM estadisticas_dns WHERE fecha < datetime('now', '-30 days')")
+                    cursor.execute("DELETE FROM lateral_connections WHERE fecha < datetime('now', '-30 days')")
+                    cursor.execute("DELETE FROM alertas WHERE fecha < datetime('now', '-90 days')")
+                    ciclos_sin_limpieza = 0
+                    print(f"[{ahora}] Limpieza de retención ejecutada")
                 conn.commit()
                 print(f"[{ahora}] ntopng OK — {len(hosts)} dispositivos guardados")
             else:
