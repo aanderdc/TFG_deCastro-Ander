@@ -196,27 +196,33 @@ def enviar_telegram(mensaje):
 
 def registrar_alerta(cursor, tipo, ip, descripcion, severidad='MEDIA'):
     ahora = get_ahora_madrid()
-    # Evitar duplicados en los últimos 10 minutos
-    existe = cursor.execute('''
-        SELECT id FROM alertas 
-        WHERE tipo=? AND ip=? AND fecha >= datetime(?, '-10 minutes')
-    ''', (tipo, ip, ahora)).fetchone()
-    if not existe:
-        cursor.execute('''INSERT INTO alertas (fecha, tipo, ip, descripcion, severidad)
-                          VALUES (?, ?, ?, ?, ?)''',
-                       (ahora, tipo, ip, descripcion, severidad))
-        # Notificación Telegram solo para CRITICA y ALTA
-        if severidad in ('CRITICA', 'ALTA'):
-            iconos = {'CRITICA': '🔴', 'ALTA': '🟠'}
-            icono = iconos.get(severidad, '⚪')
-            enviar_telegram(
-                f"{icono} <b>ALERTA {severidad}</b>\n"
-                f"<b>Tipo:</b> {tipo}\n"
-                f"<b>IP:</b> {ip}\n"
-                f"<b>Descripción:</b> {descripcion}\n"
-                f"<b>Hora:</b> {ahora}"
-            )
-        print(f"[ALERTA] {severidad} — {tipo} — {ip} — {descripcion}")
+    clave = f"{tipo}|{ip}"
+
+    # Deduplicación en memoria (sin query a BD)
+    ultima = _alertas_recientes.get(clave)
+    if ultima:
+        desde_ultima = (datetime.now(madrid_tz) - ultima).total_seconds()
+        if desde_ultima < 600:  # 10 minutos
+            return
+
+    _alertas_recientes[clave] = datetime.now(madrid_tz)
+
+    cursor.execute('''INSERT INTO alertas (fecha, tipo, ip, descripcion, severidad)
+                      VALUES (?, ?, ?, ?, ?)''',
+                   (ahora, tipo, ip, descripcion, severidad))
+
+    # Notificación Telegram solo para CRITICA y ALTA
+    if severidad in ('CRITICA', 'ALTA'):
+        iconos = {'CRITICA': '🔴', 'ALTA': '🟠'}
+        icono = iconos.get(severidad, '⚪')
+        enviar_telegram(
+            f"{icono} <b>ALERTA {severidad}</b>\n"
+            f"<b>Tipo:</b> {tipo}\n"
+            f"<b>IP:</b> {ip}\n"
+            f"<b>Descripción:</b> {descripcion}\n"
+            f"<b>Hora:</b> {ahora}"
+        )
+    print(f"[ALERTA] {severidad} — {tipo} — {ip} — {descripcion}")
 
 def detectar_alertas(cursor, hosts, dns_data=None):
     ahora = get_ahora_madrid()
@@ -390,6 +396,9 @@ def get_ntopng_hosts():
 # Rastrea la última línea procesada para no reprocesar todo el log cada ciclo
 # Caché en memoria para fabricantes MAC (evita consultas repetidas a BD y API)
 _mac_cache = {}
+# Caché en memoria para deduplicación de alertas (evita query a BD por cada alerta)
+# Formato: "tipo|ip" → timestamp última alerta
+_alertas_recientes = {}
 _tshark_last_pos = 0
 _tshark_lock = threading.Lock()
 _suricata_last_pos = 0
@@ -708,6 +717,8 @@ def background_logger():
                     cursor.execute("DELETE FROM alertas WHERE fecha < datetime('now', '-90 days')")
                     ciclos_sin_limpieza = 0
                     print(f"[{ahora}] Limpieza de retención ejecutada")
+                    # Limpiar caché de alertas en memoria
+                    _alertas_recientes.clear()
                 conn.commit()
                 print(f"[{ahora}] ntopng OK — {len(hosts)} dispositivos guardados")
             else:
