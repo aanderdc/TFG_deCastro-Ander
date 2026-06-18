@@ -130,19 +130,29 @@ def parse_tshark_line(line):
         return {"num": "", "tiempo": "", "src": "", "dst": "", "protocolo": "", "len": "", "info": line}
 
 def get_fabricante(mac):
-    """Consulta el fabricante de una MAC. Usa caché en SQLite."""
+    """Consulta el fabricante de una MAC. Caché en memoria → SQLite → API externa."""
     if not mac or mac == '00:00:00:00:00:00':
         return "Desconocido"
     mac_upper = mac.upper()
+
+    # 1. Caché en memoria (sin tocar BD ni red)
+    if mac_upper in _mac_cache:
+        return _mac_cache[mac_upper]
+
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
+
+        # 2. Caché en SQLite
         cached = cursor.execute(
             'SELECT fabricante FROM mac_vendors WHERE mac=?', (mac_upper,)
         ).fetchone()
         if cached:
             conn.close()
+            _mac_cache[mac_upper] = cached[0]
             return cached[0]
+
+        # 3. Solo si no está en ningún caché → API externa
         try:
             r = requests.get(f"https://api.maclookup.app/v2/macs/{mac}", timeout=5)
             if r.status_code == 200:
@@ -154,14 +164,17 @@ def get_fabricante(mac):
                 fabricante = 'Desconocido'
         except:
             fabricante = 'Desconocido'
+
         cursor.execute(
             'INSERT OR REPLACE INTO mac_vendors (mac, fabricante, fecha) VALUES (?, ?, ?)',
             (mac_upper, fabricante, get_ahora_madrid())
         )
         conn.commit()
         conn.close()
+        _mac_cache[mac_upper] = fabricante
         print(f"[MAC] {mac} → {fabricante}")
         return fabricante
+
     except Exception as e:
         print(f"[MAC] Error: {e}")
         return 'Desconocido'
@@ -375,6 +388,8 @@ def get_ntopng_hosts():
 
 # --- DETECCIÓN DE TRÁFICO LATERAL ---
 # Rastrea la última línea procesada para no reprocesar todo el log cada ciclo
+# Caché en memoria para fabricantes MAC (evita consultas repetidas a BD y API)
+_mac_cache = {}
 _tshark_last_pos = 0
 _tshark_lock = threading.Lock()
 _suricata_last_pos = 0
