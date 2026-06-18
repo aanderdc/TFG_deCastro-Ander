@@ -412,6 +412,8 @@ def close_db():
 # Caché en memoria para deduplicación de alertas (evita query a BD por cada alerta)
 # Formato: "tipo|ip" → timestamp última alerta
 _alertas_recientes = {}
+# Caché para /api/data (evita llamar a Pi-hole en cada request)
+_api_data_cache = {'data': None, 'ts': 0}
 # Rastrea la última línea procesada para no reprocesar todo el log cada ciclo
 _tshark_last_pos = 0
 _tshark_lock = threading.Lock()
@@ -815,6 +817,9 @@ def index():
 @app.route('/api/data')
 @login_required
 def get_stats():
+    ahora_ts = time.time()
+    if _api_data_cache['data'] and ahora_ts - _api_data_cache['ts'] < 30:
+        return jsonify(_api_data_cache['data'])
     sid = get_sid()
     if not sid: return jsonify({"error": "Auth failed"}), 401
     try:
@@ -825,13 +830,16 @@ def get_stats():
         blocked_q = data.get('queries', {}).get('blocked', 0)
         percent = round((blocked_q / total_q) * 100, 1) if total_q > 0 else 0.0
         domains = data.get('gravity', {}).get('domains_being_blocked', 0)
-        return jsonify({
+        resultado = {
             "dns_queries_today": total_q,
             "ads_blocked_today": blocked_q,
             "ads_percentage_today": percent,
             "domains_being_blocked": domains,
             "last_update": get_ahora_madrid().split(" ")[1]
-        })
+        }
+        _api_data_cache['data'] = resultado
+        _api_data_cache['ts'] = ahora_ts
+        return jsonify(resultado)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
