@@ -414,6 +414,50 @@ def close_db():
 _alertas_recientes = {}
 # Caché para /api/data (evita llamar a Pi-hole en cada request)
 _api_data_cache = {'data': None, 'ts': 0}
+
+# Caché de hashes JA3 maliciosos — se refresca cada 24h desde fuente pública
+_ja3_db = {}
+_ja3_db_ts = 0
+_JA3_DB_URL = 'https://raw.githubusercontent.com/trisulnsm/ja3era/master/ja3fingerprints.json'
+
+def cargar_ja3_db():
+    """Descarga la DB de hashes JA3 maliciosos. Fallback a lista local si falla."""
+    global _ja3_db, _ja3_db_ts
+    JA3_LOCAL = {
+        'e54c6e2fd03f1e2b1c7f8f6e0aefb3a6': 'Cobalt Strike',
+        '72a589da586844d7f0818ce684948eea': 'Cobalt Strike',
+        '6bca5d2a0b7d3d21e06a216c57b7bbfe': 'Cobalt Strike',
+        'c27b06e79a31aff0839438dfff99f4a6': 'Metasploit',
+        'd4d44f04a29f4e18bc49d48de3a88d55': 'Metasploit',
+        '5d41402abc4b2a76b9719d911017c592': 'Sliver C2',
+        'a0e9f5d64349fb13191bc781f81f42e1': 'Covenant C2',
+    }
+    try:
+        r = requests.get(_JA3_DB_URL, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            # El JSON tiene formato {hash: {desc: "..."}} o lista de {md5: ..., desc: ...}
+            nueva_db = {}
+            if isinstance(data, list):
+                for entry in data:
+                    h = entry.get('md5') or entry.get('ja3_md5') or entry.get('hash', '')
+                    desc = entry.get('desc') or entry.get('name') or entry.get('tool', 'Desconocido')
+                    if h:
+                        nueva_db[h.lower()] = desc
+            elif isinstance(data, dict):
+                for h, v in data.items():
+                    desc = v.get('desc') or v if isinstance(v, str) else 'Desconocido'
+                    nueva_db[h.lower()] = desc
+            if nueva_db:
+                _ja3_db = {**JA3_LOCAL, **nueva_db}
+                _ja3_db_ts = time.time()
+                print(f"[JA3] DB actualizada: {len(_ja3_db)} hashes cargados")
+                return
+    except Exception as e:
+        print(f"[JA3] Error descargando DB: {e} — usando lista local")
+    _ja3_db = JA3_LOCAL
+    _ja3_db_ts = time.time()
+
 # Rastrea la última línea procesada para no reprocesar todo el log cada ciclo
 _tshark_last_pos = 0
 _tshark_lock = threading.Lock()
@@ -585,21 +629,12 @@ def detectar_doh(cursor):
 def detectar_ja3(cursor):
     """
     Detecta huellas TLS (JA3) asociadas a herramientas C2 conocidas.
-    Lee el CSV generado por el contenedor tshark-ja3.
+    Usa DB dinámica actualizada cada 24h desde trisulnsm/ja3era.
     """
-    JA3_C2 = {
-        # Cobalt Strike
-        'e54c6e2fd03f1e2b1c7f8f6e0aefb3a6': 'Cobalt Strike',
-        '72a589da586844d7f0818ce684948eea': 'Cobalt Strike',
-        '6bca5d2a0b7d3d21e06a216c57b7bbfe': 'Cobalt Strike',
-        # Metasploit
-        'c27b06e79a31aff0839438dfff99f4a6': 'Metasploit',
-        'd4d44f04a29f4e18bc49d48de3a88d55': 'Metasploit',
-        # Sliver
-        '5d41402abc4b2a76b9719d911017c592': 'Sliver C2',
-        # Covenant
-        'a0e9f5d64349fb13191bc781f81f42e1': 'Covenant C2',
-    }
+    global _ja3_db, _ja3_db_ts
+    # Refrescar DB cada 24h
+    if not _ja3_db or time.time() - _ja3_db_ts > 86400:
+        cargar_ja3_db()
 
     JA3_PATH = '/app/tshark_logs/tshark_ja3.csv'
     try:
@@ -612,10 +647,9 @@ def detectar_ja3(cursor):
                 if len(parts) < 4:
                     continue
                 src, dst, puerto, ja3 = parts[0], parts[1], parts[2], parts[3]
-                ja3s = parts[4] if len(parts) > 4 else ''
 
-                if ja3 and ja3 in JA3_C2:
-                    herramienta = JA3_C2[ja3]
+                if ja3 and ja3.lower() in _ja3_db:
+                    herramienta = _ja3_db[ja3.lower()]
                     registrar_alerta(cursor, 'JA3_C2', src,
                         f'Huella TLS C2 detectada: {herramienta} | '
                         f'{src} → {dst}:{puerto} | JA3={ja3}',
@@ -1346,6 +1380,7 @@ def api_red_pihole():
 
 if __name__ == '__main__':
     init_db()
+    cargar_ja3_db()  # Carga inicial de hashes JA3 maliciosos
     threading.Thread(target=background_logger, daemon=True).start()
     app.run(host='0.0.0.0', port=5000, debug=False)
 
