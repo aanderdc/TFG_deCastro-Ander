@@ -1220,33 +1220,41 @@ NODE_EXPORTER_URL = 'http://127.0.0.1:9100/metrics'
 def api_red_metrics():
     try:
         resp = requests.get(NODE_EXPORTER_URL, timeout=3)
-        text = resp.text
 
-        def val(pattern):
-            m = re.search(pattern, text, re.MULTILINE)
-            return float(m.group(1)) if m else None
-
-        load1     = val(r'^node_load1\s+([\d.]+)') or 0.0
-        load5     = val(r'^node_load5\s+([\d.]+)') or 0.0
-        mem_total = val(r'^node_memory_MemTotal_bytes\s+([\d.e+]+)') or 0
-        mem_avail = val(r'^node_memory_MemAvailable_bytes\s+([\d.e+]+)') or 0
-        disk_avail = val(r'node_filesystem_avail_bytes\{[^}]*mountpoint="/etc/hostname"[^}]*\}\s+([\d.e+]+)')
-        disk_size  = val(r'node_filesystem_size_bytes\{[^}]*mountpoint="/etc/hostname"[^}]*\}\s+([\d.e+]+)')
-        temp      = val(r'node_thermal_zone_temp\{[^}]*\}\s+([\d.e+]+)')
-        net_rx    = val(r'node_network_receive_bytes_total\{device="wlan0"\}\s+([\d.e+]+)')
-        net_tx    = val(r'node_network_transmit_bytes_total\{device="wlan0"\}\s+([\d.e+]+)')
-
+        # Parsear línea a línea una sola vez (en vez de 8 re.search/finditer separados)
+        metrics = {}
         ifaces = {}
-        for m in re.finditer(r'node_network_receive_bytes_total\{device="([^"]+)"\}\s+([\d.e+]+)', text):
-            ifaces.setdefault(m.group(1), {})['rx'] = float(m.group(2))
-        for m in re.finditer(r'node_network_transmit_bytes_total\{device="([^"]+)"\}\s+([\d.e+]+)', text):
-            ifaces.setdefault(m.group(1), {})['tx'] = float(m.group(2))
-        interfaces = [{'name': k, 'rx': v.get('rx',0), 'tx': v.get('tx',0)} for k,v in ifaces.items()]
+        for line in resp.text.splitlines():
+            if line.startswith('#'):
+                continue
+            # Métricas simples clave=valor
+            m = re.match(r'^(node_load1|node_load5|node_memory_MemTotal_bytes|node_memory_MemAvailable_bytes|node_thermal_zone_temp)\s+([\d.e+]+)', line)
+            if m:
+                metrics[m.group(1)] = float(m.group(2))
+                continue
+            # Filesystem
+            m = re.match(r'^(node_filesystem_avail_bytes|node_filesystem_size_bytes)\{[^}]*mountpoint="/etc/hostname"[^}]*\}\s+([\d.e+]+)', line)
+            if m:
+                metrics[m.group(1)] = float(m.group(2))
+                continue
+            # Interfaces de red
+            m = re.match(r'^node_network_(receive|transmit)_bytes_total\{device="([^"]+)"\}\s+([\d.e+]+)', line)
+            if m:
+                direction = 'rx' if m.group(1) == 'receive' else 'tx'
+                ifaces.setdefault(m.group(2), {})[direction] = float(m.group(3))
 
-        return jsonify({'ok': True, 'load1': load1, 'load5': load5,
-                        'mem_total': mem_total, 'mem_avail': mem_avail,
-                        'disk_avail': disk_avail, 'disk_size': disk_size,
-                        'temp': temp, 'net_rx': net_rx, 'net_tx': net_tx,
+        interfaces = [{'name': k, 'rx': v.get('rx', 0), 'tx': v.get('tx', 0)} for k, v in ifaces.items()]
+
+        return jsonify({'ok': True,
+                        'load1':      metrics.get('node_load1', 0.0),
+                        'load5':      metrics.get('node_load5', 0.0),
+                        'mem_total':  metrics.get('node_memory_MemTotal_bytes', 0),
+                        'mem_avail':  metrics.get('node_memory_MemAvailable_bytes', 0),
+                        'disk_avail': metrics.get('node_filesystem_avail_bytes'),
+                        'disk_size':  metrics.get('node_filesystem_size_bytes'),
+                        'temp':       metrics.get('node_thermal_zone_temp'),
+                        'net_rx':     ifaces.get('wlan0', {}).get('rx'),
+                        'net_tx':     ifaces.get('wlan0', {}).get('tx'),
                         'interfaces': interfaces})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
