@@ -243,6 +243,7 @@ def detectar_alertas(cursor, hosts, dns_data=None):
         ip = h['ip']
         score = h.get('score', 0)
         bajada = h.get('rcvd_mb', 0)
+        subida = h.get('sent_mb', 0)
         flows = h.get('flows', 0)
 
         # 1. Score alto
@@ -262,32 +263,18 @@ def detectar_alertas(cursor, hosts, dns_data=None):
                 registrar_alerta(cursor, 'TRAFICO_ALTO', ip,
                     f'Tráfico {bajada:.1f}MB vs media {medias[ip]:.1f}MB', 'ALTA')
 
-    # 4. Pico de DNS bloqueadas
-    if ultimo_dns and penultimo_dns:
-        diff = ultimo_dns[0] - penultimo_dns[0]
-        if diff > 50:
-            registrar_alerta(cursor, 'DNS_BLOQUEADAS', '—',
-                f'{diff} nuevas amenazas DNS bloqueadas en 30s', 'ALTA')
-   # 5. Detección de flood — demasiados flows activos desde una IP
-    UMBRAL_FLOWS_FLOOD = 500
-    for h in hosts:
-        ip = h['ip']
-        flows = h.get('flows', 0)
+        # 5. Flood — demasiados flows activos
+        UMBRAL_FLOWS_FLOOD = 500
         if flows > UMBRAL_FLOWS_FLOOD:
             severidad = 'CRITICA' if flows > 2000 else 'ALTA'
             registrar_alerta(cursor, 'FLOOD_DETECTADO', ip,
-                f'Posible flood: {flows} flows activos desde {ip}',
-                severidad)
+                f'Posible flood: {flows} flows activos desde {ip}', severidad)
 
-    # 6. Ratio subida/bajada anómalo (exfiltración o amplificación UDP)
-    for h in hosts:
-        ip = h['ip']
-        bajada = h.get('rcvd_mb', 0)
-        subida = h.get('sent_mb', 0)
+        # 6. Ratio subida/bajada anómalo (exfiltración o amplificación UDP)
         if subida > 50 and bajada > 0 and subida / bajada > 10:
             registrar_alerta(cursor, 'RATIO_ANOMALO', ip,
-                f'Ratio subida/bajada anómalo: ↑{subida:.1f}MB / ↓{bajada:.1f}MB',
-                'ALTA')
+                f'Ratio subida/bajada anómalo: ↑{subida:.1f}MB / ↓{bajada:.1f}MB', 'ALTA')
+
 # --- BUGFIX: ntopng_login estaba erróneamente metido dentro de detectar_alertas ---
 def ntopng_login():
     """Hace login en ntopng. Si el login está desactivado, lo marca como autenticado directamente."""
