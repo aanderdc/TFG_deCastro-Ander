@@ -376,17 +376,20 @@ def get_ntopng_hosts():
 # --- DETECCIÓN DE TRÁFICO LATERAL ---
 # Rastrea la última línea procesada para no reprocesar todo el log cada ciclo
 _tshark_last_pos = 0
+_tshark_lock = threading.Lock()
 _suricata_last_pos = 0
+_suricata_lock = threading.Lock()
 
 def analizar_trafico_lateral(cursor):
-    global _tshark_last_pos  # <-- AQUÍ, primera línea de la función
-    try:
-        with open(TSHARK_LOG_PATH, 'r', errors='replace') as f:
-            f.seek(_tshark_last_pos)
-            nuevas = f.readlines()
-            _tshark_last_pos = f.tell()
-    except FileNotFoundError:
-        return
+    global _tshark_last_pos
+    with _tshark_lock:
+        try:
+            with open(TSHARK_LOG_PATH, 'r', errors='replace') as f:
+                f.seek(_tshark_last_pos)
+                nuevas = f.readlines()
+                _tshark_last_pos = f.tell()
+        except FileNotFoundError:
+            return
 
     ahora = get_ahora_madrid()
     # src_ip -> conjunto de dst_ip distintas contactadas en este ciclo
@@ -601,13 +604,14 @@ def detectar_suricata(cursor):
     if not eve_path:
         return
 
-    try:
-        with open(eve_path, 'r', errors='replace') as f:
-            f.seek(_suricata_last_pos)
-            nuevas = f.readlines()
-            _suricata_last_pos = f.tell()
-    except FileNotFoundError:
-        return
+    with _suricata_lock:
+        try:
+            with open(eve_path, 'r', errors='replace') as f:
+                f.seek(_suricata_last_pos)
+                nuevas = f.readlines()
+                _suricata_last_pos = f.tell()
+        except FileNotFoundError:
+            return
 
     # Mapeo severidad Suricata (1=crítica, 2=alta, 3=media) → dashboard
     mapa_severidad = {1: 'CRITICA', 2: 'ALTA', 3: 'MEDIA'}
