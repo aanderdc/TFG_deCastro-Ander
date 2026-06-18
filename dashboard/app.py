@@ -1165,9 +1165,17 @@ def sniffer():
     n = int(request.args.get('n', 100))
     filtro = request.args.get('filtro', '').lower()
     try:
-        with open(TSHARK_LOG_PATH, 'r', errors='replace') as f:
-            todas = f.readlines()
-        total_lineas = len(todas)
+        import subprocess
+        # Leer solo las últimas líneas con tail (sin cargar todo en memoria)
+        resultado = subprocess.run(
+            ['tail', '-n', '5000', TSHARK_LOG_PATH],
+            capture_output=True, text=True, errors='replace'
+        )
+        todas = resultado.stdout.splitlines(keepends=True)
+        total_lineas = int(subprocess.run(
+            ['wc', '-l', TSHARK_LOG_PATH],
+            capture_output=True, text=True
+        ).stdout.split()[0])
         if filtro:
             todas = [l for l in todas if filtro in l.lower()]
         ultimas = todas[-n:]
@@ -1184,8 +1192,12 @@ def api_sniffer():
     n = int(request.args.get('n', 100))
     filtro = request.args.get('filtro', '').lower()
     try:
-        with open(TSHARK_LOG_PATH, 'r', errors='replace') as f:
-            todas = f.readlines()
+        import subprocess
+        resultado = subprocess.run(
+            ['tail', '-n', '5000', TSHARK_LOG_PATH],
+            capture_output=True, text=True, errors='replace'
+        )
+        todas = resultado.stdout.splitlines(keepends=True)
         if filtro:
             todas = [l for l in todas if filtro in l.lower()]
         ultimas = todas[-n:]
