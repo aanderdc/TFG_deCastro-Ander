@@ -393,12 +393,26 @@ def get_ntopng_hosts():
         return None
 
 # --- DETECCIÓN DE TRÁFICO LATERAL ---
-# Rastrea la última línea procesada para no reprocesar todo el log cada ciclo
+
 # Caché en memoria para fabricantes MAC (evita consultas repetidas a BD y API)
 _mac_cache = {}
+# Pool de conexiones SQLite por thread (evita crear conexión nueva en cada request)
+_db_local = threading.local()
+
+def get_db():
+    if not hasattr(_db_local, 'conn') or _db_local.conn is None:
+        _db_local.conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+        _db_local.conn.row_factory = sqlite3.Row
+    return _db_local.conn
+
+def close_db():
+    if hasattr(_db_local, 'conn') and _db_local.conn:
+        _db_local.conn.close()
+        _db_local.conn = None
 # Caché en memoria para deduplicación de alertas (evita query a BD por cada alerta)
 # Formato: "tipo|ip" → timestamp última alerta
 _alertas_recientes = {}
+# Rastrea la última línea procesada para no reprocesar todo el log cada ciclo
 _tshark_last_pos = 0
 _tshark_lock = threading.Lock()
 _suricata_last_pos = 0
@@ -789,11 +803,13 @@ def logout():
 @app.route('/')
 @login_required
 def index():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
+    # ... código ...
+    # (sin conn.close() — se reutiliza)
     cursor.execute("SELECT dispositivo, ip, bytes_bajada, protocolo_l7, fecha_hora FROM trafico_dispositivos ORDER BY id DESC LIMIT 15")
     flujos = cursor.fetchall()
-    conn.close()
+    
     return render_template('index.html', flujos=flujos, raspberry_ip=RASPBERRY_IP)
 
 @app.route('/api/data')
@@ -822,7 +838,7 @@ def get_stats():
 @app.route('/alertas')
 @login_required
 def alertas():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''SELECT id, fecha, tipo, ip, descripcion, severidad 
                       FROM alertas ORDER BY id DESC LIMIT 100''')
@@ -830,21 +846,21 @@ def alertas():
     total = cursor.execute('SELECT COUNT(*) FROM alertas').fetchone()[0]
     criticas = cursor.execute("SELECT COUNT(*) FROM alertas WHERE severidad='CRITICA'").fetchone()[0]
     altas = cursor.execute("SELECT COUNT(*) FROM alertas WHERE severidad='ALTA'").fetchone()[0]
-    conn.close()
+    # conn reutilizada por get_db()
     return render_template('alertas.html', alertas=rows, total=total, criticas=criticas, altas=altas)
 
 @app.route('/api/alertas')
 @login_required
 def api_alertas():
     n = int(request.args.get('n', 20))
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
     rows = cursor.execute('''SELECT id, fecha, tipo, ip, descripcion, severidad 
                               FROM alertas ORDER BY id DESC LIMIT ?''', (n,)).fetchall()
     no_leidas = cursor.execute(
         "SELECT COUNT(*) FROM alertas WHERE fecha >= datetime('now', '-5 minutes', 'localtime')"
     ).fetchone()[0]
-    conn.close()
+    # conn reutilizada por get_db()
     return jsonify({
         "ok": True,
         "alertas": [{"id": r[0], "fecha": r[1], "tipo": r[2], "ip": r[3],
@@ -858,11 +874,11 @@ def api_alertas():
 def api_alertas_export_csv():
     import csv, io
     from flask import Response
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     rows = conn.execute(
         'SELECT id, fecha, tipo, ip, descripcion, severidad FROM alertas ORDER BY id DESC'
     ).fetchall()
-    conn.close()
+    # conn reutilizada por get_db()
     output = io.StringIO()
     writer = csv.writer(output, delimiter='\t')
     writer.writerow(['ID', 'Fecha', 'Tipo', 'IP', 'Descripcion', 'Severidad'])
@@ -884,10 +900,10 @@ def api_csrf_token():
 def api_alertas_clear():
     err = csrf_protect()
     if err: return err
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     conn.execute('DELETE FROM alertas')
     conn.commit()
-    conn.close()
+    # conn reutilizada por get_db()
     return jsonify({"ok": True})
 
 # --- BUGFIX: faltaba el decorador @app.route('/graficas') ---
@@ -907,7 +923,7 @@ def estadisticas():
 @login_required
 def api_trafico_total():
     horas = int(request.args.get('horas', 24))
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
         SELECT 
@@ -920,7 +936,7 @@ def api_trafico_total():
         ORDER BY momento ASC
     ''', (f'-{horas} hours',))
     rows = cursor.fetchall()
-    conn.close()
+    # conn reutilizada por get_db()
     return jsonify({
         "labels": [r[0] for r in rows],
         "bajada": [round(r[1], 3) for r in rows],
@@ -931,7 +947,7 @@ def api_trafico_total():
 @login_required
 def api_trafico_dispositivos():
     horas = int(request.args.get('horas', 24))
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
         SELECT ip, SUM(bytes_bajada) as total_bajada, SUM(bytes_subida) as total_subida
@@ -943,7 +959,7 @@ def api_trafico_dispositivos():
         LIMIT 10
     ''', (f'-{horas} hours',))
     rows = cursor.fetchall()
-    conn.close()
+    # conn reutilizada por get_db()
     return jsonify({
         "labels": [r[0] for r in rows],
         "bajada": [round(r[1], 3) for r in rows],
@@ -954,7 +970,7 @@ def api_trafico_dispositivos():
 @login_required
 def api_graficas_dns():
     horas = int(request.args.get('horas', 24))
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
         SELECT 
@@ -966,7 +982,7 @@ def api_graficas_dns():
         ORDER BY momento ASC
     ''', (f'-{horas} hours',))
     rows = cursor.fetchall()
-    conn.close()
+    # conn reutilizada por get_db()
     return jsonify({
         "labels": [r[0] for r in rows],
         "total": [r[1] for r in rows],
@@ -976,9 +992,9 @@ def api_graficas_dns():
 @app.route('/api/mac_vendors')
 @login_required
 def api_mac_vendors():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     rows = conn.execute('SELECT mac, fabricante, fecha FROM mac_vendors ORDER BY fecha DESC').fetchall()
-    conn.close()
+    # conn reutilizada por get_db()
     return jsonify({"ok": True, "total": len(rows),
                     "vendors": [{"mac": r[0], "fabricante": r[1], "fecha": r[2]} for r in rows]})
 
@@ -997,7 +1013,7 @@ def api_hosts():
 @app.route('/lateral')
 @login_required
 def lateral():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
     # Últimas 200 conexiones laterales
     rows = cursor.execute('''
@@ -1012,14 +1028,14 @@ def lateral():
         WHERE fecha >= datetime('now', '-24 hours', 'localtime')
         GROUP BY src_ip ORDER BY destinos DESC LIMIT 10
     ''').fetchall()
-    conn.close()
+    # conn reutilizada por get_db()
     return render_template('lateral.html', conexiones=rows, total=total, srcs=srcs_unicos)
 
 @app.route('/api/lateral')
 @login_required
 def api_lateral():
     horas = int(request.args.get('horas', 1))
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
     rows = cursor.execute('''
         SELECT fecha, src_ip, dst_ip, protocolo, puerto_dst, info
@@ -1036,7 +1052,7 @@ def api_lateral():
             grafo[src] = []
         if dst not in grafo[src]:
             grafo[src].append(dst)
-    conn.close()
+    # conn reutilizada por get_db()
     return jsonify({
         "ok": True,
         "total": len(rows),
@@ -1050,10 +1066,10 @@ def api_lateral():
 def api_lateral_clear():
     err = csrf_protect()
     if err: return err
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     conn.execute('DELETE FROM lateral_connections')
     conn.commit()
-    conn.close()
+    # conn reutilizada por get_db()
     return jsonify({"ok": True})
 
 
