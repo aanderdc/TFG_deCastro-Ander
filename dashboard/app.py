@@ -8,6 +8,7 @@ from flask import Flask, jsonify, render_template, request, redirect, url_for, s
 from datetime import datetime
 import sqlite3
 import threading
+from concurrent.futures import ThreadPoolExecutor
 import time
 from functools import wraps
 import os
@@ -693,7 +694,7 @@ def background_logger():
             else:
                 print(f"[{ahora}] ntopng sin datos de hosts")
 
-            # 3. Análisis de tráfico lateral (tshark) — siempre, independiente de ntopng
+            # 2. Análisis de tráfico lateral (tshark) — siempre, independiente de ntopng
             analizar_trafico_lateral(cursor)
             detectar_beaconing(cursor)
             detectar_doh(cursor)
@@ -702,20 +703,27 @@ def background_logger():
             conn.commit()
 
 
-            # 2. Captura Pi-hole DNS
-            sid = get_sid()
-            if sid:
-                try:
-                    headers = {"X-FTL-SID": sid}
-                    r_pi = requests.get(f"{PIHOLE_BASE_URL}/stats/summary", headers=headers, timeout=5)
-                    if r_pi.status_code == 200:
-                        d = r_pi.json()
-                        cursor.execute("INSERT INTO estadisticas_dns (fecha, total_queries, ads_blocked) VALUES (?, ?, ?)",
-                                       (ahora, d.get('queries', {}).get('total', 0), d.get('queries', {}).get('blocked', 0)))
-                        conn.commit()
-                except: pass
+            # 3. Captura Pi-hole DNS (en paralelo con un thread)
+            def capturar_pihole():
+                sid = get_sid()
+                if sid:
+                    try:
+                        headers = {"X-FTL-SID": sid}
+                        r_pi = requests.get(f"{PIHOLE_BASE_URL}/stats/summary", headers=headers, timeout=5)
+                        if r_pi.status_code == 200:
+                            d = r_pi.json()
+                            conn_ph = sqlite3.connect(DB_PATH)
+                            conn_ph.execute("INSERT INTO estadisticas_dns (fecha, total_queries, ads_blocked) VALUES (?, ?, ?)",
+                                           (ahora, d.get('queries', {}).get('total', 0), d.get('queries', {}).get('blocked', 0)))
+                            conn_ph.commit()
+                            conn_ph.close()
+                    except: pass
+
+            hilo_pihole = threading.Thread(target=capturar_pihole, daemon=True)
+            hilo_pihole.start()
 
             conn.close()
+            hilo_pihole.join(timeout=6)
         except Exception as e:
             print(f"Error crítico en logger: {e}")
 
