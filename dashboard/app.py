@@ -1378,12 +1378,6 @@ def api_red_pihole():
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 
-if __name__ == '__main__':
-    init_db()
-    cargar_ja3_db()  # Carga inicial de hashes JA3 maliciosos
-    threading.Thread(target=background_logger, daemon=True).start()
-    app.run(host='0.0.0.0', port=5000, debug=False)
-
 #ENDPOINT SURICATA
 @app.route('/api/suricata/alertas')
 @login_required
@@ -1464,3 +1458,10 @@ def api_fail2ban_bans():
         return jsonify({'ok': True, 'ips': ips, 'jails': jails, 'total_ips': len(ips)})
     except Exception as e:
         return jsonify({'ok': False, 'ips': [], 'jails': [], 'total_ips': 0, 'error': str(e)})
+
+if __name__ == '__main__':
+    init_db()
+    cargar_ja3_db()  # Carga inicial de hashes JA3 maliciosos
+    threading.Thread(target=background_logger, daemon=True).start()
+    app.run(host='0.0.0.0', port=5000, debug=False)
+
