@@ -1422,27 +1422,45 @@ def api_suricata_alertas():
 @app.route('/api/fail2ban/bans')
 @login_required
 def api_fail2ban_bans():
-    import subprocess
     try:
-        result = subprocess.run(
-            ['docker', 'exec', 'fail2ban', 'fail2ban-client', 'status'],
-            capture_output=True, text=True, timeout=5
-        )
+        DOCKER_API = os.environ.get('DOCKER_HOST', 'tcp://127.0.0.1:2375').replace('tcp://', 'http://')
+
+        # Ejecutar fail2ban-client status via Docker API exec
+        r = requests.post(f"{DOCKER_API}/containers/fail2ban/exec", json={
+            "AttachStdout": True, "AttachStderr": True,
+            "Cmd": ["fail2ban-client", "status"]
+        }, timeout=5)
+        exec_id = r.json().get('Id')
+        if not exec_id:
+            return jsonify({'ok': False, 'error': 'No se pudo crear exec', 'ips': [], 'jails': [], 'total_ips': 0})
+
+        r2 = requests.post(f"{DOCKER_API}/exec/{exec_id}/start",
+                           json={"Detach": False, "Tty": False},
+                           headers={"Content-Type": "application/json"}, timeout=5)
+        output = r2.content.decode('utf-8', errors='replace')
+
         jails = []
-        ips = []
-        for line in result.stdout.splitlines():
+        for line in output.splitlines():
             if 'Jail list:' in line:
                 jails = [j.strip() for j in line.split(':')[1].split(',') if j.strip()]
+
+        ips = []
         for jail in jails:
-            r2 = subprocess.run(
-                ['docker', 'exec', 'fail2ban', 'fail2ban-client', 'status', jail],
-                capture_output=True, text=True, timeout=5
-            )
-            for line in r2.stdout.splitlines():
-                if 'Banned IP list:' in line:
-                    banned = line.split(':')[1].strip()
-                    if banned:
-                        ips.extend(banned.split())
+            r3 = requests.post(f"{DOCKER_API}/containers/fail2ban/exec", json={
+                "AttachStdout": True, "AttachStderr": True,
+                "Cmd": ["fail2ban-client", "status", jail]
+            }, timeout=5)
+            eid = r3.json().get('Id')
+            if eid:
+                r4 = requests.post(f"{DOCKER_API}/exec/{eid}/start",
+                                   json={"Detach": False, "Tty": False},
+                                   headers={"Content-Type": "application/json"}, timeout=5)
+                for line in r4.content.decode('utf-8', errors='replace').splitlines():
+                    if 'Banned IP list:' in line:
+                        banned = line.split(':')[1].strip()
+                        if banned:
+                            ips.extend(banned.split())
+
         return jsonify({'ok': True, 'ips': ips, 'jails': jails, 'total_ips': len(ips)})
     except Exception as e:
         return jsonify({'ok': False, 'ips': [], 'jails': [], 'total_ips': 0, 'error': str(e)})
