@@ -1,3 +1,9 @@
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   pihole:
     container_name: pihole
@@ -5,22 +11,31 @@ services:
     ports:
       - "53:53/tcp"
       - "53:53/udp"
-      - "80:80/tcp"
+      - "8080:80/tcp"
     environment:
-      TZ: 'Europe/Madrid'
+      TZ: '${TZ:-Europe/Madrid}'
+      FTLCONF_webserver_api_password: '${PIHOLE_PASSWORD}'
       WEBPASSWORD: '${PIHOLE_PASSWORD}'
     volumes:
       - './etc-pihole:/etc/pihole'
       - './etc-dnsmasq.d:/etc/dnsmasq.d'
     restart: unless-stopped
+    mem_limit: 256m
+    logging: *default-logging
     networks:
       - monitoring
+
   node-exporter:
     image: prom/node-exporter:latest
     container_name: node-exporter
     restart: unless-stopped
     ports:
       - "127.0.0.1:9100:9100"
+    mem_limit: 64m
+    logging: *default-logging
+    networks:
+      - monitoring
+
   prometheus:
     image: prom/prometheus:latest
     profiles: ["opcional"]
@@ -29,21 +44,29 @@ services:
     ports:
       - "127.0.0.1:9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    mem_limit: 384m
+    logging: *default-logging
+    networks:
+      - monitoring
+
   pihole-exporter:
     profiles: ["opcional"]
     container_name: pihole-exporter
     image: ekofr/pihole-exporter:latest
     ports:
-      - "127.0.0.1:9167:9167"
+      - "127.0.0.1:9167:9617"
     environment:
       - PIHOLE_PROTOCOL=http
       - PIHOLE_HOSTNAME=pihole
       - PIHOLE_PASSWORD=${PIHOLE_PASSWORD}
       - PIHOLE_PORT=80
     restart: unless-stopped
+    mem_limit: 64m
+    logging: *default-logging
     networks:
       - monitoring
+
   grafana:
     profiles: ["opcional"]
     container_name: grafana
@@ -52,59 +75,106 @@ services:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - TZ=${TZ:-Europe/Madrid}
     volumes:
       - ./grafana_data:/var/lib/grafana
     restart: unless-stopped
+    mem_limit: 384m
+    logging: *default-logging
+    networks:
+      - monitoring
+
   redis:
-    image: redis:alpine
-    command: redis-server --requirepass ${REDIS_PASSWORD} --save "" --appendonly no
+    image: redis:7-alpine
+    command: >
+      sh -c 'exec redis-server --bind 127.0.0.1 --protected-mode yes --requirepass "$$REDIS_PASSWORD" --save "" --appendonly no --maxmemory 128mb --maxmemory-policy allkeys-lru'
     container_name: redis-ntopng
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     restart: unless-stopped
     network_mode: "host"
+    mem_limit: 160m
+    logging: *default-logging
     volumes:
       - ./ntopng_redis:/data
+
   ntopng:
     image: ntop/ntopng_arm64.dev:latest
     container_name: ntopng
     restart: unless-stopped
     network_mode: "host"
-    privileged: true
-    environment:
-      - TZ=Europe/Madrid
-    volumes:
-      - ./ntopng_data:/var/lib/ntopng
-      - ./ntopng_redis:/var/lib/redis
-    command: ntopng -i wlan0 -w 3001 --community -r 127.0.0.1:6379:${REDIS_PASSWORD}@0
-    depends_on:
-      - redis
-  tshark-sflow:
-    image: ubuntu:22.04
-    container_name: tshark-sflow
-    restart: unless-stopped
-    network_mode: host
-    privileged: true
     cap_add:
       - NET_ADMIN
       - NET_RAW
+    environment:
+      - TZ=${TZ:-Europe/Madrid}
+      - NET_INTERFACE=${NET_INTERFACE:-eth0}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - ./ntopng_data:/var/lib/ntopng
+    command: >
+      sh -c 'exec ntopng -i "${NET_INTERFACE:-eth0}" -w 3001 --community -r "127.0.0.1:6379:${REDIS_PASSWORD}@0"'
+    mem_limit: 512m
+    logging: *default-logging
+    depends_on:
+      - redis
+
+  tshark-sflow:
+    build:
+      context: ./tshark
+    container_name: tshark-sflow
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      - TSHARK_MODE=sflow
+      - NET_INTERFACE=${NET_INTERFACE:-eth0}
+      - TSHARK_MAX_LOG_BYTES=${TSHARK_MAX_LOG_BYTES:-20971520}
     volumes:
       - ./tshark_logs:/logs
-    command: >
-      bash -c "apt-get update -qq && apt-get install -y -qq tshark &&
-      touch /logs/tshark_capture.txt && chmod 666 /logs/tshark_capture.txt &&
-      tshark -i wlan0 -s 1600 -l >> /logs/tshark_capture.txt 2>&1"
+    mem_limit: 192m
+    logging: *default-logging
+
+  tshark-ja3:
+    build:
+      context: ./tshark
+    container_name: tshark-ja3
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      - TSHARK_MODE=ja3
+      - NET_INTERFACE=${NET_INTERFACE:-eth0}
+      - TSHARK_MAX_LOG_BYTES=${TSHARK_MAX_LOG_BYTES:-10485760}
+    volumes:
+      - ./tshark_logs:/logs
+    mem_limit: 128m
+    logging: *default-logging
+
   nginx:
     image: nginx:alpine
     container_name: nginx-siem
     network_mode: "host"
     restart: unless-stopped
     volumes:
-      - ./nginx/siem.conf:/etc/nginx/conf.d/default.conf
-      - ./nginx/certs:/etc/nginx/certs
+      - ./nginx/siem.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    mem_limit: 64m
+    logging: *default-logging
+    depends_on:
+      - dashboard
+
+  # Acceso REST a Docker SOLO en localhost (127.0.0.1:2375) — nunca expuesto a la LAN
   docker-proxy:
-    image: tecnativa/docker-socket-proxy
+    image: tecnativa/docker-socket-proxy:latest
     container_name: docker-proxy
     restart: unless-stopped
-    network_mode: "host"
+    ports:
+      - "127.0.0.1:2375:2375"
     environment:
       - CONTAINERS=1
       - START=1
@@ -113,32 +183,41 @@ services:
       - LOGS=1
       - INFO=1
       - POST=1
+      - EXEC=1
       - IMAGES=1
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    mem_limit: 64m
+    logging: *default-logging
+    networks:
+      - monitoring
+
   dashboard:
-    image: python:3.9-slim
+    build:
+      context: ../dashboard
     container_name: mi_dashboard
     network_mode: "host"
     restart: unless-stopped
     env_file:
       - .env
-    volumes:
-      - ../dashboard:/app
-      - ./tshark_logs:/tshark_logs
-      - ./tshark_logs:/app/tshark_logs
-      - ./suricata/logs:/suricata/logs
     environment:
+      - TZ=${TZ:-Europe/Madrid}
       - DOCKER_HOST=tcp://127.0.0.1:2375
-    working_dir: /app
-    command: >
-      sh -c "pip show flask > /dev/null 2>&1 || pip install -q flask requests pytz docker flask-limiter && python app.py"
+      - PIHOLE_BASE_URL=http://127.0.0.1:8080/api
+    volumes:
+      - ../dashboard/data:/app/data
+      - ./tshark_logs:/tshark_logs
+      - ./suricata/logs:/suricata/logs:ro
+    mem_limit: 384m
+    logging: *default-logging
     depends_on:
       - pihole
       - docker-proxy
+
   wireguard:
     image: linuxserver/wireguard:latest
     container_name: wireguard
+    profiles: ["vpn"]
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
@@ -147,17 +226,20 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=Europe/Madrid
+      - TZ=${TZ:-Europe/Madrid}
       - SERVERURL=${WIREGUARD_SERVERURL}
       - PEERS=3
-      - PEERDNS=${WIREGUARD_SERVERURL}
+      - PEERDNS=${RASPBERRY_IP}
       - ALLOWEDIPS=0.0.0.0/0
     ports:
-      - 51820:51820/udp
+      - "51820:51820/udp"
     volumes:
       - ../wireguard_config:/config
-      - /lib/modules:/lib/modules
+      - /lib/modules:/lib/modules:ro
     restart: unless-stopped
+    mem_limit: 128m
+    logging: *default-logging
+
   mitmproxy:
     image: mitmproxy/mitmproxy:latest
     profiles: ["opcional"]
@@ -169,71 +251,60 @@ services:
     environment:
       - MITMWEB_PASSWORD=${MITMWEB_PASSWORD}
     command: >
-      sh -c "mitmweb --web-host 0.0.0.0 --web-port 8081 --listen-port 8080 --no-web-open-browser --set web_password=$$MITMWEB_PASSWORD --mode transparent"
+      sh -c 'exec mitmweb --web-host 127.0.0.1 --web-port 8081 --listen-port 8082 --no-web-open-browser --set web_password="$$MITMWEB_PASSWORD" --mode transparent'
+    mem_limit: 256m
+    logging: *default-logging
+
   ngrok:
     image: ngrok/ngrok:latest
+    profiles: ["opcional"]
     container_name: ngrok
     restart: unless-stopped
     network_mode: "host"
     environment:
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
-    command: http https://localhost:443
+    command: http https://127.0.0.1:443
+    mem_limit: 96m
+    logging: *default-logging
     depends_on:
       - nginx
-  tshark-ja3:
-    image: ubuntu:22.04
-    container_name: tshark-ja3
-    restart: unless-stopped
-    network_mode: host
-    privileged: true
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-    volumes:
-      - ./tshark_logs:/logs
-    command: >
-      bash -c "DEBIAN_FRONTEND=noninteractive apt-get update -qq &&
-      echo 'wireshark-common wireshark-common/install-setuid boolean true' | debconf-set-selections &&
-      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tshark &&
-      echo 'ip.src,ip.dst,tcp.dstport,tls.handshake.ja3,tls.handshake.ja3s' > /logs/tshark_ja3.csv &&
-      tshark -i wlan0 -s 1600 -l -Y 'tls.handshake.type == 1 or tls.handshake.type == 2'
-      -T fields
-      -e ip.src -e ip.dst -e tcp.dstport
-      -e tls.handshake.ja3 -e tls.handshake.ja3s
-      -E separator=, -E header=n
-      >> /logs/tshark_ja3.csv 2>&1"
+
   suricata:
     image: jasonish/suricata:latest
     container_name: suricata
     restart: unless-stopped
     network_mode: host
-    privileged: true
     cap_add:
       - NET_ADMIN
       - NET_RAW
       - SYS_NICE
     volumes:
+      - ./suricata/suricata.yaml:/etc/suricata/suricata.yaml:ro
       - ./suricata/rules:/var/lib/suricata/rules
       - ./suricata/logs:/var/log/suricata
-    command: suricata -i wlan0 --init-errors-fatal
+    command: >
+      sh -c 'exec suricata -i "${NET_INTERFACE:-eth0}" --init-errors-fatal'
+    mem_limit: 512m
+    logging: *default-logging
 
   fail2ban:
     image: crazymax/fail2ban:latest
     container_name: fail2ban
     restart: unless-stopped
     network_mode: host
-    privileged: true
     cap_add:
       - NET_ADMIN
       - NET_RAW
     environment:
-      - TZ=Europe/Madrid
+      - TZ=${TZ:-Europe/Madrid}
       - F2B_LOG_LEVEL=INFO
     volumes:
-      - ./fail2ban/jail.d:/data/jail.d
-      - ./fail2ban/filter.d:/data/filter.d
+      - ./fail2ban/jail.d:/data/jail.d:ro
+      - ./fail2ban/filter.d:/data/filter.d:ro
       - /var/log:/var/log:ro
       - /etc/localtime:/etc/localtime:ro
+    mem_limit: 128m
+    logging: *default-logging
 
 networks:
   monitoring:

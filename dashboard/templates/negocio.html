@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% set active_page = 'negocio' %}
+{% block title %}Mi Negocio — Activos y Horario{% endblock %}
+{% block page_heading %}🏪 Mi Negocio — Gestión de Activos y Reglas{% endblock %}
+{% block page_subheading %}Inventario de TPVs, Impresoras/Plotters, NAS de Diseños, Horario Comercial y Filtro DNS{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <!-- ALTA / EDICIÓN DE EQUIPO -->
+  <div class="col-lg-5">
+    <div class="panel-card h-100">
+      <h6 class="fw-bold text-uppercase small text-muted mb-3">Registrar o Clasificar Equipo</h6>
+      <div class="d-flex gap-1 flex-wrap mb-3">
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="preset('IMPRESORA_PLOTTER', 9100, 'CRITICO', true)">🖨️ Plotter/Impresora</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="preset('TPV_CAJA', 80, 'CRITICO', true)">💳 TPV / Caja</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="preset('SERVIDOR_NAS', 445, 'CRITICO', true)">🗄️ NAS Diseños</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="preset('WIFI_CLIENTES', 0, 'INVITADO', false)">📱 Wi-Fi Clientes</button>
+      </div>
+      <form id="asset-form" onsubmit="guardarActivo(event)">
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">IP del equipo *</label>
+            <input type="text" id="a-ip" class="form-control form-control-sm" placeholder="192.168.1.50" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">MAC (opcional)</label>
+            <input type="text" id="a-mac" class="form-control form-control-sm" placeholder="AA:BB:CC:DD:EE:FF">
+          </div>
+          <div class="col-12">
+            <label class="form-label small fw-semibold">Nombre / Alias *</label>
+            <input type="text" id="a-nombre" class="form-control form-control-sm" placeholder="Ej: Plotter Roland Gran Formato / TPV Caja 1" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Categoría</label>
+            <select id="a-cat" class="form-select form-select-sm">
+              {% for code, meta in categorias.items() %}
+              <option value="{{ code }}">{{ meta.icon }} {{ meta.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Criticidad</label>
+            <select id="a-crit" class="form-select form-select-sm">
+              <option value="CRITICO">🔴 Crítico (TPV / Impresora / NAS)</option>
+              <option value="NORMAL">🟢 Normal (PC Oficina / Diseño)</option>
+              <option value="INVITADO">🟡 Invitado (Wi-Fi Clientes)</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Puerto Watchdog TCP</label>
+            <input type="number" id="a-puerto" class="form-control form-control-sm" value="9100" min="0" max="65535">
+            <div class="form-text" style="font-size:0.7rem;">9100 JetDirect · 631 IPP · 445 SMB · 80 HTTP · 0 desactiva</div>
+          </div>
+          <div class="col-md-6 d-flex flex-column justify-content-center pt-2">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="a-auth" checked>
+              <label class="form-check-label small" for="a-auth">Equipo autorizado</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="a-mon" checked>
+              <label class="form-check-label small" for="a-mon">Vigilar disponibilidad (caídas)</label>
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label small fw-semibold">Notas</label>
+            <input type="text" id="a-notas" class="form-control form-control-sm" placeholder="Ubicación, proveedor de mantenimiento, etc.">
+          </div>
+        </div>
+        <div class="mt-3 d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-sm flex-grow-1">💾 Guardar Equipo</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('asset-form').reset()">Limpiar</button>
+        </div>
+      </form>
+      <div id="asset-feedback" class="small mt-2"></div>
+    </div>
+  </div>
+
+  <!-- HORARIO COMERCIAL & PERFIL -->
+  <div class="col-lg-7">
+    <div class="panel-card mb-4">
+      <h6 class="fw-bold text-uppercase small text-muted mb-3">Perfil del Negocio y Horario Comercial</h6>
+      <form id="biz-form" onsubmit="guardarNegocio(event)">
+        <div class="row g-2">
+          <div class="col-md-7">
+            <label class="form-label small fw-semibold">Nombre del negocio</label>
+            <input type="text" id="b-nombre" class="form-control form-control-sm" value="{{ negocio.negocio_nombre }}" required>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label small fw-semibold">Tipo</label>
+            <select id="b-tipo" class="form-select form-select-sm">
+              <option value="imprenta" {% if negocio.negocio_tipo == 'imprenta' %}selected{% endif %}>Imprenta / Artes Gráficas</option>
+              <option value="libreria" {% if negocio.negocio_tipo == 'libreria' %}selected{% endif %}>Librería / Papelería</option>
+              <option value="copisteria" {% if negocio.negocio_tipo == 'copisteria' %}selected{% endif %}>Copistería</option>
+              <option value="mixto" {% if negocio.negocio_tipo == 'mixto' %}selected{% endif %}>Mixto</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Hora apertura</label>
+            <input type="time" id="b-apertura" class="form-control form-control-sm" value="{{ negocio.horario_apertura }}" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Hora cierre</label>
+            <input type="time" id="b-cierre" class="form-control form-control-sm" value="{{ negocio.horario_cierre }}" required>
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <div class="form-check mb-1">
+              <input class="form-check-input" type="checkbox" id="b-alerta" {% if negocio.alerta_fuera_horario %}checked{% endif %}>
+              <label class="form-check-label small fw-semibold" for="b-alerta">Alertar fuera de horario</label>
+            </div>
+          </div>
+          <div class="col-12 mt-2">
+            <label class="form-label small fw-semibold d-block">Días abiertos</label>
+            {% set dias_set = negocio.dias_apertura.split(',') %}
+            {% for idx, lbl in [('0','Lun'),('1','Mar'),('2','Mié'),('3','Jue'),('4','Vie'),('5','Sáb'),('6','Dom')] %}
+            <div class="form-check form-check-inline">
+              <input class="form-check-input b-dia" type="checkbox" value="{{ idx }}" id="dia-{{ idx }}" {% if idx in dias_set %}checked{% endif %}>
+              <label class="form-check-label small" for="dia-{{ idx }}">{{ lbl }}</label>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="mt-3 d-flex align-items-center gap-3">
+          <button type="submit" class="btn btn-dark btn-sm">Guardar configuración</button>
+          <span id="biz-feedback" class="small text-success"></span>
+        </div>
+      </form>
+    </div>
+
+    <!-- BLOQUEO RÁPIDO DE DOMINIOS EN PI-HOLE -->
+    <div class="panel-card">
+      <h6 class="fw-bold text-uppercase small text-muted mb-2">Bloqueo Rápido de Dominios (Pi-hole)</h6>
+      <p class="small text-muted mb-2">Bloquea en toda la red de la tienda sitios maliciosos, descargas o distracciones en 1 clic.</p>
+      <div class="input-group input-group-sm mb-3">
+        <input type="text" id="block-domain" class="form-control" placeholder="ej: tiktok.com o sitio-sospechoso.xyz">
+        <input type="text" id="block-comment" class="form-control" placeholder="Motivo (opcional)">
+        <button class="btn btn-danger" onclick="bloquearDominio()">🚫 Bloquear</button>
+      </div>
+      <div id="blocklist-feedback" class="small mb-2"></div>
+      <div id="blocklist-items" class="d-flex flex-wrap gap-2">
+        <span class="small text-muted">Cargando dominios bloqueados...</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TABLA DE ACTIVOS REGISTRADOS -->
+<div class="panel-card mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h6 class="fw-bold text-uppercase small text-muted mb-0">Inventario de Activos de la Tienda</h6>
+    <button class="btn btn-sm btn-outline-primary" onclick="checkNow()">↻ Comprobar disponibilidad ahora</button>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Equipo</th>
+          <th>IP / MAC</th>
+          <th>Categoría</th>
+          <th>Acceso</th>
+          <th>Watchdog</th>
+          <th>Estado</th>
+          <th>Uptime 24h</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="activos-tbody">
+        <tr><td colspan="8" class="text-center text-muted py-3">Cargando inventario...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function preset(cat, port, crit, auth) {
+    document.getElementById('a-cat').value = cat;
+    document.getElementById('a-puerto').value = port;
+    document.getElementById('a-crit').value = crit;
+    document.getElementById('a-auth').checked = auth;
+    document.getElementById('a-mon').checked = port > 0;
+  }
+
+  // Rellenar desde parámetros URL si se pulsó "Clasificar" desde el Dashboard
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('ip')) document.getElementById('a-ip').value = params.get('ip');
+  if (params.get('mac')) document.getElementById('a-mac').value = params.get('mac');
+  if (params.get('nombre')) document.getElementById('a-nombre').value = params.get('nombre');
+
+  async function cargarActivos() {
+    const d = await apiFetch('/api/activos');
+    const tbody = document.getElementById('activos-tbody');
+    if (!d.ok || !d.activos.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Sin equipos registrados aún. Empieza añadiendo tus impresoras, TPVs y NAS arriba.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = d.activos.map(a => {
+      const st = a.estado_uptime === 'ONLINE'
+        ? `<span class="badge bg-success">ONLINE (${esc(a.latencia_ms ?? '—')} ms)</span>`
+        : a.estado_uptime === 'OFFLINE'
+          ? '<span class="badge bg-danger">CAÍDO</span>'
+          : '<span class="badge bg-secondary">—</span>';
+      const auth = a.autorizado
+        ? '<span class="badge bg-success-subtle text-success border">Autorizado</span>'
+        : '<span class="badge bg-warning text-dark">Restringido / Invitado</span>';
+      return `<tr>
+        <td class="fw-semibold small">${esc(a.categoria_icon)} ${esc(a.nombre)}<div class="text-muted" style="font-size:0.7rem;">${esc(a.notas)}</div></td>
+        <td class="small font-monospace">${esc(a.ip)}<div class="text-muted" style="font-size:0.7rem;">${esc(a.mac || '—')}</div></td>
+        <td class="small">${esc(a.categoria_label)}</td>
+        <td>${auth}</td>
+        <td class="small">${a.monitorear_uptime ? `TCP :${esc(a.puerto_check)}` : '<span class="text-muted">Inactivo</span>'}</td>
+        <td>${st}</td>
+        <td class="small fw-semibold">${a.uptime_pct != null ? esc(a.uptime_pct) + '%' : '—'}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="borrarActivo(${a.id})">Eliminar</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function guardarActivo(e) {
+    e.preventDefault();
+    const body = {
+      ip: document.getElementById('a-ip').value,
+      mac: document.getElementById('a-mac').value,
+      nombre: document.getElementById('a-nombre').value,
+      categoria: document.getElementById('a-cat').value,
+      criticidad: document.getElementById('a-crit').value,
+      puerto_check: parseInt(document.getElementById('a-puerto').value || '0', 10),
+      autorizado: document.getElementById('a-auth').checked,
+      monitorear_uptime: document.getElementById('a-mon').checked,
+      notas: document.getElementById('a-notas').value,
+    };
+    const res = await apiFetch('/api/activos', { method: 'POST', body });
+    const fb = document.getElementById('asset-feedback');
+    if (res.ok) {
+      fb.className = 'small mt-2 text-success';
+      fb.textContent = '✅ Equipo guardado correctamente.';
+      document.getElementById('asset-form').reset();
+      cargarActivos();
+    } else {
+      fb.className = 'small mt-2 text-danger';
+      fb.textContent = '⚠️ ' + (res.error || 'Error guardando equipo');
+    }
+  }
+
+  async function borrarActivo(id) {
+    if (!confirm('¿Eliminar este equipo del inventario?')) return;
+    await apiFetch(`/api/activos/${id}`, { method: 'DELETE' });
+    cargarActivos();
+  }
+
+  async function checkNow() {
+    await apiFetch('/api/activos/check-now', { method: 'POST' });
+    cargarActivos();
+  }
+
+  async function guardarNegocio(e) {
+    e.preventDefault();
+    const dias = [...document.querySelectorAll('.b-dia:checked')].map(el => el.value).join(',');
+    const body = {
+      negocio_nombre: document.getElementById('b-nombre').value,
+      negocio_tipo: document.getElementById('b-tipo').value,
+      horario_apertura: document.getElementById('b-apertura').value,
+      horario_cierre: document.getElementById('b-cierre').value,
+      dias_apertura: dias,
+      alerta_fuera_horario: document.getElementById('b-alerta').checked,
+    };
+    const res = await apiFetch('/api/negocio/config', { method: 'POST', body });
+    const fb = document.getElementById('biz-feedback');
+    fb.textContent = res.ok ? '✅ Configuración guardada' : '⚠️ ' + (res.error || 'Error');
+  }
+
+  async function cargarBlocklist() {
+    try {
+      const d = await apiFetch('/api/pihole/blocklist');
+      const div = document.getElementById('blocklist-items');
+      if (!d.ok || !d.domains.length) {
+        div.innerHTML = '<span class="small text-muted">Sin dominios personalizados bloqueados (o Pi-hole sin conexión).</span>';
+        return;
+      }
+      div.innerHTML = d.domains.map(item => `
+        <span class="badge bg-light text-dark border d-inline-flex align-items-center gap-2 py-2 px-2">
+          🚫 ${esc(item.domain)}
+          <button type="button" class="btn-close" style="font-size:0.55rem;" onclick="desbloquearDominio('${esc(item.domain)}')"></button>
+        </span>`).join('');
+    } catch (_) {}
+  }
+
+  async function bloquearDominio() {
+    const domain = document.getElementById('block-domain').value.trim();
+    const comment = document.getElementById('block-comment').value.trim();
+    const fb = document.getElementById('blocklist-feedback');
+    const res = await apiFetch('/api/pihole/blocklist', { method: 'POST', body: { domain, comment } });
+    fb.className = 'small mb-2 ' + (res.ok ? 'text-success' : 'text-danger');
+    fb.textContent = res.message || res.error || '';
+    if (res.ok) {
+      document.getElementById('block-domain').value = '';
+      cargarBlocklist();
+    }
+  }
+
+  async function desbloquearDominio(domain) {
+    await apiFetch('/api/pihole/blocklist', { method: 'DELETE', body: { domain } });
+    cargarBlocklist();
+  }
+
+  cargarActivos();
+  cargarBlocklist();
+</script>
+{% endblock %}

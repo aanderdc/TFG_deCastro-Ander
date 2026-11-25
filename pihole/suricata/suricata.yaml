@@ -2,14 +2,27 @@
 ---
 vars:
   address-groups:
-    HOME_NET: "192.168.0.0/16"
+    HOME_NET: "[192.168.0.0/16,10.0.0.0/8,172.16.0.0/12]"
     EXTERNAL_NET: "!$HOME_NET"
 
+# La interfaz real se pasa por CLI desde docker-compose (-i $NET_INTERFACE)
 af-packet:
-  - interface: wlan0
+  - interface: eth0
     cluster-id: 99
     cluster-type: cluster_flow
     defrag: yes
+    tpacket-v3: yes
+    ring-size: 2048
+
+# Límites de memoria adaptados a Raspberry Pi 4 (4GB RAM)
+flow:
+  memcap: 64mb
+  hash-size: 32768
+  prealloc: 5000
+stream:
+  memcap: 64mb
+  reassembly:
+    memcap: 64mb
 
 outputs:
   - eve-log:
@@ -23,7 +36,7 @@ outputs:
         - dns
         - http
 
-default-rule-path: /etc/suricata/rules
+default-rule-path: /var/lib/suricata/rules
 rule-files:
   - suricata.rules
 

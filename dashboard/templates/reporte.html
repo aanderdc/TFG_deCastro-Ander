@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Informe Ejecutivo de Seguridad — {{ r.negocio.negocio_nombre }}</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f8fafc; color: #1e293b; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .report-sheet { background: white; max-width: 960px; margin: 1.5rem auto; padding: 2rem 2.5rem; border-radius: 12px; border: 1px solid #e2e8f0; }
+    .score-pill { font-size: 2.2rem; font-weight: 800; }
+    @media print {
+      body { background: white; }
+      .no-print { display: none !important; }
+      .report-sheet { border: none; margin: 0; padding: 0; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+<div class="container no-print pt-3 d-flex justify-content-between align-items-center" style="max-width:960px;">
+  <a href="/" class="btn btn-sm btn-outline-secondary">← Volver al Dashboard</a>
+  <div class="d-flex gap-2">
+    <a href="/reporte?dias=7" class="btn btn-sm {% if r.dias == 7 %}btn-dark{% else %}btn-outline-dark{% endif %}">7 días</a>
+    <a href="/reporte?dias=30" class="btn btn-sm {% if r.dias == 30 %}btn-dark{% else %}btn-outline-dark{% endif %}">30 días</a>
+    <a href="/reporte?dias=90" class="btn btn-sm {% if r.dias == 90 %}btn-dark{% else %}btn-outline-dark{% endif %}">90 días</a>
+    <button onclick="window.print()" class="btn btn-sm btn-primary">🖨️ Imprimir / Guardar PDF</button>
+  </div>
+</div>
+
+<div class="report-sheet">
+  <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-4">
+    <div>
+      <div class="text-uppercase small fw-bold text-primary">Informe Ejecutivo de Ciberseguridad y Red</div>
+      <h2 class="fw-bold mb-1">{{ r.negocio.negocio_nombre }}</h2>
+      <div class="small text-muted">
+        Actividad: {{ r.negocio.negocio_tipo|capitalize }} · Periodo analizado: últimos {{ r.dias }} días · Generado: {{ r.generado_en }}
+      </div>
+    </div>
+    <div class="text-end">
+      <div class="small text-muted text-uppercase fw-bold">Índice de Salud</div>
+      <div class="score-pill text-{{ r.health.color }}">{{ r.health.score }}/100</div>
+      <div class="small fw-semibold">{{ r.health.mensaje }}</div>
+    </div>
+  </div>
+
+  <!-- RESUMEN KPI -->
+  <div class="row g-3 mb-4 text-center">
+    <div class="col-3"><div class="p-3 bg-light rounded border"><div class="small text-muted">Alertas Críticas</div><div class="fs-4 fw-bold text-danger">{{ r.sev_counts.CRITICA }}</div></div></div>
+    <div class="col-3"><div class="p-3 bg-light rounded border"><div class="small text-muted">Alertas Altas</div><div class="fs-4 fw-bold text-warning">{{ r.sev_counts.ALTA }}</div></div></div>
+    <div class="col-3"><div class="p-3 bg-light rounded border"><div class="small text-muted">Bloqueo DNS</div><div class="fs-4 fw-bold text-success">{{ r.dns.percent }}%</div></div></div>
+    <div class="col-3"><div class="p-3 bg-light rounded border"><div class="small text-muted">Uptime WAN 24h</div><div class="fs-4 fw-bold text-primary">{{ r.health.wan_uptime_24h }}%</div></div></div>
+  </div>
+
+  <!-- CHECKLIST DE SEGURIDAD PYME -->
+  <h5 class="fw-bold mb-2">1. Lista de Verificación de Seguridad del Negocio</h5>
+  <table class="table table-sm table-bordered mb-4">
+    <thead class="table-light"><tr><th>Control</th><th>Estado</th><th>Detalle</th></tr></thead>
+    <tbody>
+      {% for c in r.checklist %}
+      <tr>
+        <td class="small">{{ c.item }}</td>
+        <td>{% if c.ok %}<span class="badge bg-success">OK</span>{% else %}<span class="badge bg-warning text-dark">MEJORAR</span>{% endif %}</td>
+        <td class="small text-muted">{{ c.detalle }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- DISPONIBILIDAD DE EQUIPOS CRÍTICOS -->
+  <h5 class="fw-bold mb-2">2. Disponibilidad de Equipos Críticos (TPVs, Impresoras, Plotters, NAS)</h5>
+  <table class="table table-sm table-bordered mb-4">
+    <thead class="table-light"><tr><th>Equipo</th><th>IP</th><th>Categoría</th><th>Estado Actual</th><th>Disponibilidad ({{ r.dias }}d)</th></tr></thead>
+    <tbody>
+      {% for a in r.activos %}
+      <tr>
+        <td class="small fw-semibold">{{ a.nombre }}</td>
+        <td class="small font-monospace">{{ a.ip }}</td>
+        <td class="small">{{ a.categoria_label }}</td>
+        <td><span class="badge {% if a.estado_uptime == 'ONLINE' %}bg-success{% elif a.estado_uptime == 'OFFLINE' %}bg-danger{% else %}bg-secondary{% endif %}">{{ a.estado_uptime }}</span></td>
+        <td class="small">{{ a.uptime_pct if a.uptime_pct is not none else '—' }}{% if a.uptime_pct is not none %}%{% endif %}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="text-center text-muted small">Sin activos registrados en el inventario.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- INCIDENTES RELEVANTES -->
+  <h5 class="fw-bold mb-2">3. Incidentes Relevantes y Recomendaciones</h5>
+  <table class="table table-sm table-bordered mb-4">
+    <thead class="table-light"><tr><th>Fecha</th><th>Severidad</th><th>Tipo</th><th>Detalle y Acción Recomendada</th><th>Estado</th></tr></thead>
+    <tbody>
+      {% for inc in r.recent_critical %}
+      <tr>
+        <td class="small text-nowrap">{{ inc.fecha }}</td>
+        <td><span class="badge {% if inc.severidad == 'CRITICA' %}bg-danger{% else %}bg-warning text-dark{% endif %}">{{ inc.severidad }}</span></td>
+        <td class="small fw-semibold">{{ inc.tipo }}</td>
+        <td class="small">
+          <div>{{ inc.descripcion }}</div>
+          {% if inc.recomendacion %}<div class="text-primary mt-1">💡 {{ inc.recomendacion }}</div>{% endif %}
+        </td>
+        <td class="small">{{ inc.estado }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="text-center text-success small py-3">✅ No se han registrado incidentes críticos o altos en los últimos {{ r.dias }} días.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- TOP CONSUMO DE RED -->
+  <h5 class="fw-bold mb-2">4. Dispositivos con Mayor Tráfico Real ({{ r.dias }} días)</h5>
+  <table class="table table-sm table-bordered mb-2">
+    <thead class="table-light"><tr><th>Dispositivo</th><th>IP</th><th>Descarga (MB)</th><th>Subida (MB)</th></tr></thead>
+    <tbody>
+      {% for dev in r.top_devices %}
+      <tr>
+        <td class="small fw-semibold">{{ dev.nombre }}</td>
+        <td class="small font-monospace">{{ dev.ip }}</td>
+        <td class="small">{{ dev.bajada_mb }} MB</td>
+        <td class="small">{{ dev.subida_mb }} MB</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="text-center text-muted small">Sin registros de tráfico en este periodo.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

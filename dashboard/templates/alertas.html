@@ -1,378 +1,214 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Alertas — S.I.E.M.</title>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    :root { --primary-dark: #0f172a; --bg-light: #f8fafc; }
-    body { background-color: var(--bg-light); color: #334155; font-family: 'Segoe UI', sans-serif; }
-    .header-bar {
-      background-color: var(--primary-dark);
-      color: white;
-      padding: 1.2rem 0;
-      border-bottom: 3px solid #334155;
-      margin-bottom: 2rem;
-      position: relative;
-    }
-    .nav-btn {
-      background-color: white;
-      color: var(--primary-dark);
-      text-decoration: none;
-      padding: 0.8rem;
-      border-radius: 8px;
-      display: inline-block;
-      text-align: center;
-      font-weight: 600;
-      border: 2px solid #e2e8f0;
-      transition: all 0.2s;
-      font-size: 0.85rem;
-    }
-    .nav-btn:hover { background-color: var(--primary-dark); color: white; }
-    .stat-card {
-      background: white;
-      border-radius: 10px;
-      padding: 1.2rem 1.5rem;
-      border: 1px solid #e2e8f0;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    .label { color: #64748b; text-transform: uppercase; font-size: 0.7rem; font-weight: 800; }
-    .value { font-size: 1.8rem; font-weight: 700; color: #1e293b; }
-    .table-container {
-      background: white;
-      border-radius: 10px;
-      padding: 1.5rem;
-      border: 1px solid #e2e8f0;
-      margin-top: 1.5rem;
-    }
-    .badge-critica { background: #dc2626; color: white; }
-    .badge-alta    { background: #ea580c; color: white; }
-    .badge-media   { background: #ca8a04; color: white; }
-    .badge-baja    { background: #16a34a; color: white; }
-    .badge-tipo {
-      font-size: 0.65rem;
-      padding: 3px 8px;
-      border-radius: 4px;
-      font-weight: 700;
-      background: #e2e8f0;
-      color: #475569;
-    }
-    .badge-suricata {
-      font-size: 0.65rem;
-      padding: 3px 8px;
-      border-radius: 4px;
-      font-weight: 700;
-      background: #7c3aed;
-      color: white;
-    }
-    .row-critica { border-left: 4px solid #dc2626; }
-    .row-alta    { border-left: 4px solid #ea580c; }
-    .row-media   { border-left: 4px solid #ca8a04; }
-    .live-dot {
-      display: inline-block;
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: #22c55e;
-      margin-right: 6px;
-      animation: blink 1.2s infinite;
-    }
-    .suricata-dot {
-      display: inline-block;
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: #7c3aed;
-      margin-right: 6px;
-      animation: blink 1.2s infinite;
-    }
-    .fail2ban-dot {
-      display: inline-block;
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: #dc2626;
-      margin-right: 6px;
-      animation: blink 1.2s infinite;
-    }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
-    .section-title {
-      font-size: 0.75rem;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    .ip-ban-badge {
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      border-radius: 6px;
-      padding: 0.5rem 1rem;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: #dc2626;
-      display: inline-block;
-      margin: 3px;
-    }
-  </style>
-</head>
-<body>
+{% extends "base.html" %}
+{% set active_page = 'alertas' %}
+{% block title %}Alertas de Seguridad — S.I.E.M. PYME{% endblock %}
+{% block page_heading %}🚨 Alertas de Seguridad e Incidentes{% endblock %}
+{% block page_subheading %}Detección en tiempo real con recomendaciones claras para tu negocio{% endblock %}
 
-<div class="header-bar text-center">
-  <div class="container">
-    <h3 class="mb-1 fw-bold">ALERTAS DE SEGURIDAD</h3>
-    <p class="mb-0 text-uppercase" style="font-size:0.8rem;color:#94a3b8;letter-spacing:2px;">TFG — Ander de Castro</p>
-  </div>
-  <a href="/logout" style="position:absolute;top:50%;right:24px;transform:translateY(-50%);
-      color:#94a3b8;font-size:0.75rem;font-weight:600;text-decoration:none;
-      border:1px solid #334155;padding:6px 14px;border-radius:6px;
-      text-transform:uppercase;letter-spacing:1px;"
-      onmouseover="this.style.color='#fff';this.style.borderColor='#ef4444'"
-      onmouseout="this.style.color='#94a3b8';this.style.borderColor='#334155'">
-      Salir →
-  </a>
+{% block extra_css %}
+.row-critica { border-left: 4px solid #dc2626; }
+.row-alta    { border-left: 4px solid #ea580c; }
+.row-media   { border-left: 4px solid #ca8a04; }
+.ip-ban-badge {
+  background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px;
+  padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 600; color: #dc2626;
+  display: inline-block; margin: 3px;
+}
+.rec-box {
+  background: #eff6ff; border-left: 3px solid #3b82f6;
+  padding: 4px 8px; border-radius: 4px; font-size: 0.76rem; color: #1e3a8a; margin-top: 4px;
+}
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4 text-center">
+  <div class="col-6 col-md-3"><div class="stat-card"><div class="metric-label">Total Histórico</div><div class="metric-val">{{ total }}</div></div></div>
+  <div class="col-6 col-md-3"><div class="stat-card"><div class="metric-label">Críticas Abiertas</div><div class="metric-val text-danger">{{ criticas }}</div></div></div>
+  <div class="col-6 col-md-3"><div class="stat-card"><div class="metric-label">Altas Abiertas</div><div class="metric-val" style="color:#ea580c;">{{ altas }}</div></div></div>
+  <div class="col-6 col-md-3"><div class="stat-card"><div class="metric-label">Últimos 5 min</div><div class="metric-val text-success" id="stat-recientes">—</div></div></div>
 </div>
 
-<div class="container">
-
-  <!-- NAV -->
-  <div class="d-flex gap-2 mb-4 flex-wrap">
-    <a href="/" class="nav-btn">Dashboard</a>
-    <a href="/sniffer" class="nav-btn">Sniffer</a>
-    <a href="/estadisticas" class="nav-btn">Estadísticas de Red</a>
-    <a href="/alertas" class="nav-btn" style="background:var(--primary-dark);color:white;">Alertas</a>
-    <a href="/lateral" class="nav-btn">Red Interna</a>
-    <a href="/contenedores" class="nav-btn">Contenedores</a>
-  </div>
-
-  <!-- STATS -->
-  <div class="row g-3 mb-2">
-    <div class="col-6 col-md-3">
-      <div class="stat-card">
-        <div class="label">Total Alertas</div>
-        <div class="value">{{ total }}</div>
-      </div>
+<!-- MOTOR PRINCIPAL DE ALERTAS -->
+<div class="panel-card mb-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div>
+      <span class="live-dot"></span>
+      <span class="fw-bold small text-uppercase text-muted">Registro de Alertas y Recomendaciones</span>
+      <span class="text-muted small ms-2" id="last-refresh">—</span>
     </div>
-    <div class="col-6 col-md-3">
-      <div class="stat-card">
-        <div class="label">Críticas</div>
-        <div class="value text-danger">{{ criticas }}</div>
-      </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="stat-card">
-        <div class="label">Altas</div>
-        <div class="value" style="color:#ea580c;">{{ altas }}</div>
-      </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="stat-card">
-        <div class="label">Últimas 5 min</div>
-        <div class="value text-success" id="stat-recientes">—</div>
-      </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <select id="f-estado" class="form-select form-select-sm w-auto" onchange="refreshAlertas()">
+        <option value="ABIERTA" selected>Solo abiertas</option>
+        <option value="">Todas</option>
+        <option value="RESUELTA">Resueltas</option>
+        <option value="FALSO_POSITIVO">Falsos positivos</option>
+      </select>
+      <select id="f-sev" class="form-select form-select-sm w-auto" onchange="refreshAlertas()">
+        <option value="">Toda severidad</option>
+        <option value="CRITICA">Crítica</option>
+        <option value="ALTA">Alta</option>
+        <option value="MEDIA">Media</option>
+      </select>
+      <input type="text" id="f-q" class="form-control form-control-sm" style="width:170px;" placeholder="Buscar IP o texto..." oninput="refreshAlertas()">
+      <a href="/api/alertas/export/csv" class="btn btn-sm btn-outline-success">⬇ Exportar CSV</a>
+      <button onclick="limpiarAlertas()" class="btn btn-sm btn-outline-danger">Vaciar historial</button>
     </div>
   </div>
 
-  <!-- SURICATA IDS -->
-  <div class="table-container">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <div>
-        <span class="suricata-dot"></span>
-        <span class="section-title">Suricata IDS — Alertas en tiempo real</span>
-        <span class="text-muted small ms-2" id="suricata-refresh">—</span>
-      </div>
-      <span class="badge" style="background:#7c3aed;color:white;" id="suricata-count">0 alertas</span>
-    </div>
-    <div class="table-responsive">
-      <table class="table align-middle table-sm">
-        <thead class="table-light">
-          <tr>
-            <th>Timestamp</th>
-            <th>Firma</th>
-            <th>Origen</th>
-            <th>Destino</th>
-            <th>Categoría</th>
-            <th>Severidad</th>
-          </tr>
-        </thead>
-        <tbody id="suricata-tbody">
-          <tr><td colspan="6" class="text-center text-muted py-3">Cargando alertas de Suricata...</td></tr>
-        </tbody>
-      </table>
-    </div>
+  <div class="table-responsive">
+    <table class="table align-middle table-sm mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Fecha</th>
+          <th>Tipo</th>
+          <th>IP / Activo</th>
+          <th>Detalle y Qué Hacer</th>
+          <th>Severidad</th>
+          <th>Gestión</th>
+        </tr>
+      </thead>
+      <tbody id="alertas-tbody">
+        <tr><td colspan="6" class="text-center text-muted py-4">Cargando alertas...</td></tr>
+      </tbody>
+    </table>
   </div>
-
-  <!-- FAIL2BAN -->
-  <div class="table-container">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <div>
-        <span class="fail2ban-dot"></span>
-        <span class="section-title">Fail2ban — IPs baneadas</span>
-        <span class="text-muted small ms-2" id="fail2ban-refresh">—</span>
-      </div>
-      <span class="badge bg-danger" id="fail2ban-count">0 IPs</span>
-    </div>
-    <div id="fail2ban-ips">
-      <span class="text-muted small">Cargando IPs baneadas...</span>
-    </div>
-    <div class="mt-3" id="fail2ban-jails"></div>
-  </div>
-
-  <!-- TABLA PRINCIPAL -->
-  <div class="table-container">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <div>
-        <span class="live-dot"></span>
-        <span class="fw-bold small text-uppercase" style="font-size:0.75rem;letter-spacing:1px;">
-          Registro de Alertas del Motor
-        </span>
-        <span class="text-muted small ms-2" id="last-refresh">—</span>
-      </div>
-      <div>
-        <a href="/api/alertas/export/csv" class="btn btn-sm btn-outline-success me-1">⬇ Exportar TXT</a>
-        <button onclick="limpiarAlertas()" class="btn btn-sm btn-outline-danger">Limpiar todas</button>
-      </div>
-    </div>
-
-    <div class="table-responsive">
-      <table class="table align-middle" id="alertas-table">
-        <thead class="table-light">
-          <tr>
-            <th>#</th>
-            <th>Fecha</th>
-            <th>Tipo</th>
-            <th>IP</th>
-            <th>Descripción</th>
-            <th>Severidad</th>
-          </tr>
-        </thead>
-        <tbody id="alertas-tbody">
-          {% for a in alertas %}
-          <tr class="row-{{ a[5]|lower }}">
-            <td class="text-muted small">{{ a[0] }}</td>
-            <td class="small">{{ a[1] }}</td>
-            <td><span class="badge-tipo">{{ a[2] }}</span></td>
-            <td class="fw-bold small">{{ a[3] }}</td>
-            <td class="small">{{ a[4] }}</td>
-            <td>
-              <span class="badge badge-{{ a[5]|lower }}">{{ a[5] }}</span>
-            </td>
-          </tr>
-          {% else %}
-          <tr>
-            <td colspan="6" class="text-center text-muted py-4">
-              No hay alertas registradas todavía. Se generarán automáticamente cada 30s.
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
 </div>
 
+<!-- SURICATA IDS -->
+<div class="panel-card mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <span class="fw-bold small text-uppercase text-muted">🟣 Suricata IDS — Detección de Intrusiones</span>
+      <span class="text-muted small ms-2" id="suricata-refresh">—</span>
+    </div>
+    <span class="badge" style="background:#7c3aed;" id="suricata-count">0 alertas</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>Timestamp</th><th>Firma</th><th>Origen</th><th>Destino</th><th>Categoría</th><th>Severidad</th></tr>
+      </thead>
+      <tbody id="suricata-tbody">
+        <tr><td colspan="6" class="text-center text-muted py-3">Cargando alertas de Suricata...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- FAIL2BAN -->
+<div class="panel-card">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <div>
+      <span class="fw-bold small text-uppercase text-muted">🔴 Fail2ban — IPs Bloqueadas (Fuerza Bruta SSH)</span>
+      <span class="text-muted small ms-2" id="fail2ban-refresh">—</span>
+    </div>
+    <span class="badge bg-danger" id="fail2ban-count">0 IPs</span>
+  </div>
+  <div id="fail2ban-ips"><span class="text-muted small">Cargando IPs baneadas...</span></div>
+  <div class="mt-2" id="fail2ban-jails"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
-  // --- Motor de alertas ---
   async function refreshAlertas() {
     try {
-      const r = await fetch('/api/alertas?n=100');
-      const d = await r.json();
+      const estado = document.getElementById('f-estado').value;
+      const sev = document.getElementById('f-sev').value;
+      const q = document.getElementById('f-q').value.trim();
+      const qs = new URLSearchParams({ n: '100', estado, severidad: sev, q });
+      const d = await apiFetch('/api/alertas?' + qs.toString());
       if (!d.ok) return;
-      document.getElementById('stat-recientes').textContent = d.no_leidas;
+      document.getElementById('stat-recientes').textContent = String(d.no_leidas);
       const tbody = document.getElementById('alertas-tbody');
-      if (d.alertas.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No hay alertas registradas todavía.</td></tr>';
+      if (!d.alertas.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">✅ No hay alertas con los filtros seleccionados.</td></tr>';
         return;
       }
       tbody.innerHTML = d.alertas.map(a => {
-        const sev = a.severidad.toLowerCase();
-        const badgeClass = sev === 'critica' ? 'badge-critica'
-                         : sev === 'alta'    ? 'badge-alta'
-                         : sev === 'media'   ? 'badge-media'
-                         : 'badge-baja';
-        return `<tr class="row-${sev}">
-          <td class="text-muted small">${a.id}</td>
-          <td class="small">${a.fecha}</td>
-          <td><span class="badge-tipo">${a.tipo}</span></td>
-          <td class="fw-bold small">${a.ip}</td>
-          <td class="small">${a.descripcion}</td>
-          <td><span class="badge ${badgeClass}">${a.severidad}</span></td>
+        const s = (a.severidad || 'MEDIA').toLowerCase();
+        const badgeCls = s === 'critica' ? 'badge-critica' : s === 'alta' ? 'badge-alta' : s === 'media' ? 'badge-media' : 'badge-baja';
+        const recHtml = a.recomendacion ? `<div class="rec-box">💡 ${esc(a.recomendacion)}</div>` : '';
+        const btns = a.estado === 'ABIERTA'
+          ? `<button class="btn btn-sm btn-outline-success py-0 px-2 me-1" onclick="cambiarEstado(${a.id},'RESUELTA')">✓ Resolver</button>
+             <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="cambiarEstado(${a.id},'FALSO_POSITIVO')">Falso +</button>`
+          : `<span class="badge bg-light text-dark border me-1">${esc(a.estado)}</span>
+             <button class="btn btn-sm btn-link p-0 small" onclick="cambiarEstado(${a.id},'ABIERTA')">Reabrir</button>`;
+        return `<tr class="row-${esc(s)}">
+          <td class="small text-nowrap">${esc(a.fecha)}</td>
+          <td><span class="badge bg-light text-dark border">${esc(a.tipo)}</span></td>
+          <td class="fw-bold small font-monospace">${esc(a.ip)}</td>
+          <td class="small"><div>${esc(a.descripcion)}</div>${recHtml}</td>
+          <td><span class="badge ${badgeCls}">${esc(a.severidad)}</span></td>
+          <td class="text-nowrap">${btns}</td>
         </tr>`;
       }).join('');
-      document.getElementById('last-refresh').textContent =
-        'Actualizado: ' + new Date().toLocaleTimeString('es-ES');
-    } catch(e) { console.error(e); }
+      document.getElementById('last-refresh').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es-ES');
+    } catch (_) {}
   }
 
-  // --- Suricata ---
-  async function refreshSuricata() {
-    try {
-      const r = await fetch('/api/suricata/alertas');
-      const d = await r.json();
-      const tbody = document.getElementById('suricata-tbody');
-      document.getElementById('suricata-count').textContent = d.total + ' alertas';
-      if (!d.alertas || d.alertas.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Sin alertas recientes de Suricata.</td></tr>';
-      } else {
-        const mapa = {1:'badge-critica', 2:'badge-alta', 3:'badge-media'};
-        tbody.innerHTML = d.alertas.map(a => `
-          <tr class="row-${a.severidad_num <= 1 ? 'critica' : a.severidad_num == 2 ? 'alta' : 'media'}">
-            <td class="small text-muted">${a.timestamp}</td>
-            <td class="small">${a.signature}</td>
-            <td class="small fw-bold">${a.src_ip}</td>
-            <td class="small">${a.dst_ip}:${a.dst_port}</td>
-            <td class="small">${a.categoria}</td>
-            <td><span class="badge ${mapa[a.severidad_num] || 'badge-media'}">${a.severidad_num == 1 ? 'CRÍTICA' : a.severidad_num == 2 ? 'ALTA' : 'MEDIA'}</span></td>
-          </tr>`).join('');
-      }
-      document.getElementById('suricata-refresh').textContent =
-        'Actualizado: ' + new Date().toLocaleTimeString('es-ES');
-    } catch(e) {
-      document.getElementById('suricata-tbody').innerHTML =
-        '<tr><td colspan="6" class="text-center text-muted py-3">Suricata no disponible.</td></tr>';
-    }
-  }
-
-  // --- Fail2ban ---
-  async function refreshFail2ban() {
-    try {
-      const r = await fetch('/api/fail2ban/bans');
-      const d = await r.json();
-      document.getElementById('fail2ban-count').textContent = d.total_ips + ' IPs';
-      const container = document.getElementById('fail2ban-ips');
-      if (!d.ips || d.ips.length === 0) {
-        container.innerHTML = '<span class="text-muted small">✅ Sin IPs baneadas actualmente.</span>';
-      } else {
-        container.innerHTML = d.ips.map(ip =>
-          `<span class="ip-ban-badge">🚫 ${ip}</span>`
-        ).join('');
-      }
-      const jailsDiv = document.getElementById('fail2ban-jails');
-      if (d.jails && d.jails.length > 0) {
-        jailsDiv.innerHTML = '<div class="small text-muted mt-2">Jails activos: ' +
-          d.jails.map(j => `<span class="badge bg-secondary ms-1">${j}</span>`).join('') + '</div>';
-      }
-      document.getElementById('fail2ban-refresh').textContent =
-        'Actualizado: ' + new Date().toLocaleTimeString('es-ES');
-    } catch(e) {
-      document.getElementById('fail2ban-ips').innerHTML =
-        '<span class="text-muted small">Fail2ban no disponible.</span>';
-    }
+  async function cambiarEstado(id, estado) {
+    await apiFetch(`/api/alertas/${id}/estado`, { method: 'POST', body: { estado } });
+    refreshAlertas();
+    updateNavAlertBadge();
   }
 
   async function limpiarAlertas() {
-    if (!confirm('¿Borrar todas las alertas?')) return;
-    const t = await fetch('/api/csrf-token').then(r=>r.json());
-    await fetch('/api/alertas/clear', { method: 'POST', headers: {'X-CSRF-Token': t.token} });
+    if (!confirm('¿Borrar todo el historial de alertas?')) return;
+    await apiFetch('/api/alertas/clear', { method: 'POST' });
     refreshAlertas();
+    updateNavAlertBadge();
   }
 
-  refreshAlertas();
-  refreshSuricata();
-  refreshFail2ban();
+  async function refreshSuricata() {
+    try {
+      const d = await apiFetch('/api/suricata/alertas');
+      const tbody = document.getElementById('suricata-tbody');
+      document.getElementById('suricata-count').textContent = `${d.total || 0} alertas`;
+      if (!d.alertas || !d.alertas.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Sin alertas recientes de Suricata.</td></tr>';
+      } else {
+        const mapa = { 1: ['badge-critica', 'CRÍTICA'], 2: ['badge-alta', 'ALTA'], 3: ['badge-media', 'MEDIA'] };
+        tbody.innerHTML = d.alertas.map(a => {
+          const [cls, lbl] = mapa[a.severidad_num] || ['badge-media', 'MEDIA'];
+          return `<tr>
+            <td class="small text-muted">${esc(a.timestamp)}</td>
+            <td class="small">${esc(a.signature)}</td>
+            <td class="small fw-bold font-monospace">${esc(a.src_ip)}</td>
+            <td class="small font-monospace">${esc(a.dst_ip)}:${esc(a.dst_port)}</td>
+            <td class="small">${esc(a.categoria)}</td>
+            <td><span class="badge ${cls}">${lbl}</span></td>
+          </tr>`;
+        }).join('');
+      }
+      document.getElementById('suricata-refresh').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es-ES');
+    } catch (_) {
+      document.getElementById('suricata-tbody').innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Suricata no disponible.</td></tr>';
+    }
+  }
+
+  async function refreshFail2ban() {
+    try {
+      const d = await apiFetch('/api/fail2ban/bans');
+      document.getElementById('fail2ban-count').textContent = `${d.total_ips || 0} IPs`;
+      const container = document.getElementById('fail2ban-ips');
+      if (!d.ok) {
+        container.innerHTML = `<span class="text-muted small">⚠️ ${esc(d.error || 'Fail2ban no disponible')}</span>`;
+      } else if (!d.ips || !d.ips.length) {
+        container.innerHTML = '<span class="text-success small">✅ Sin IPs baneadas actualmente.</span>';
+      } else {
+        container.innerHTML = d.ips.map(ip => `<span class="ip-ban-badge">🚫 ${esc(ip)}</span>`).join('');
+      }
+      const jailsDiv = document.getElementById('fail2ban-jails');
+      jailsDiv.innerHTML = d.jails && d.jails.length
+        ? '<div class="small text-muted">Jails activos: ' + d.jails.map(j => `<span class="badge bg-secondary ms-1">${esc(j)}</span>`).join('') + '</div>'
+        : '';
+      document.getElementById('fail2ban-refresh').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es-ES');
+    } catch (_) {}
+  }
+
+  refreshAlertas(); refreshSuricata(); refreshFail2ban();
   setInterval(refreshAlertas, 15000);
   setInterval(refreshSuricata, 30000);
   setInterval(refreshFail2ban, 30000);
 </script>
-
-</body>
-</html>
+{% endblock %}

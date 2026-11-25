@@ -1,451 +1,316 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S.I.E.M. - Ander de Castro</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --primary-dark: #0f172a;
-            --accent-blue: #334155;
-            --bg-light: #f8fafc;
-        }
+{% extends "base.html" %}
+{% set active_page = 'dashboard' %}
+{% block title %}Dashboard — {{ negocio.negocio_nombre }}{% endblock %}
+{% block page_heading %}🛡️ {{ negocio.negocio_nombre }}{% endblock %}
+{% block page_subheading %}Panel de Seguridad y Operaciones · Interfaz {{ net_interface }}{% endblock %}
 
-        body { 
-            background-color: var(--bg-light); 
-            color: #334155;
-            font-family: 'Segoe UI', sans-serif;
-        }
+{% block extra_css %}
+.health-banner {
+  background: white;
+  border-radius: 12px;
+  padding: 1.4rem 1.6rem;
+  border: 1px solid #e2e8f0;
+  border-left: 6px solid #22c55e;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+}
+.health-score-circle {
+  width: 74px; height: 74px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.6rem; font-weight: 800; color: white;
+  flex-shrink: 0;
+}
+.asset-chip {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.7rem 0.9rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.sniffer-preview {
+  background: #0a0c0f;
+  border-radius: 10px;
+  border: 1px solid #1e2530;
+  overflow: hidden;
+}
+.sniffer-header {
+  background: #111418;
+  padding: 10px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #1e2530;
+}
+.sniffer-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Courier New', monospace;
+  font-size: 0.74rem;
+}
+.sniffer-body th { padding: 7px 12px; color: #64748b; font-size: 0.65rem; text-transform: uppercase; border-bottom: 1px solid #1e2530; }
+.sniffer-body td { padding: 6px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; border-bottom: 1px solid rgba(30,37,48,0.4); }
+.s-num { color: #64748b; } .s-time { color: #ffcc00; } .s-src { color: #00ff88; } .s-dst { color: #00d4ff; } .s-info { color: #cbd5e1; }
+{% endblock %}
 
-        .header-bar {
-            background-color: var(--primary-dark);
-            color: white;
-            padding: 1.2rem 0;
-            border-bottom: 3px solid #334155;
-            margin-bottom: 2rem;
-        }
-
-        .stat-card {
-            background: white;
-            border-radius: 10px;
-            padding: 1.5rem;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-
-        .label {
-            color: #64748b;
-            text-transform: uppercase;
-            font-size: 0.7rem;
-            font-weight: 800;
-            margin-bottom: 0.5rem;
-        }
-
-        .value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #1e293b;
-        }
-
-        .nav-btn {
-            background-color: white;
-            color: var(--primary-dark);
-            text-decoration: none;
-            padding: 0.8rem;
-            border-radius: 8px;
-            display: block;
-            text-align: center;
-            font-weight: 600;
-            border: 2px solid #e2e8f0;
-            transition: all 0.2s;
-        }
-
-        .nav-btn:hover {
-            background-color: var(--primary-dark);
-            color: white;
-            transform: translateY(-2px);
-        }
-
-
-
-        .table-container {
-            background: white;
-            border-radius: 10px;
-            padding: 1.5rem;
-            border: 1px solid #e2e8f0;
-            margin-top: 2rem;
-        }
-
-        .badge-proto {
-            background-color: #e2e8f0;
-            color: #475569;
-            font-size: 0.7rem;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-weight: 700;
-        }
-
-        /* Sniffer preview */
-        .sniffer-preview {
-            background: #0a0c0f;
-            border-radius: 10px;
-            border: 1px solid #1e2530;
-            margin-top: 2rem;
-            overflow: hidden;
-        }
-
-        .sniffer-header {
-            background: #111418;
-            padding: 12px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #1e2530;
-        }
-
-        .sniffer-title {
-            color: #00ff88;
-            font-family: 'Courier New', monospace;
-            font-size: 0.8rem;
-            font-weight: 700;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
-
-        .sniffer-title .dot {
-            display: inline-block;
-            width: 8px; height: 8px;
-            border-radius: 50%;
-            background: #00ff88;
-            margin-right: 8px;
-            animation: blink 1.2s infinite;
-        }
-
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50%       { opacity: 0.2; }
-        }
-
-        .sniffer-body {
-            padding: 0;
-            overflow-x: auto;
-        }
-
-        .sniffer-body table {
-            width: 100%;
-            border-collapse: collapse;
-            font-family: 'Courier New', monospace;
-            font-size: 0.72rem;
-        }
-
-        .sniffer-body thead tr {
-            border-bottom: 1px solid #1e2530;
-        }
-
-        .sniffer-body th {
-            padding: 8px 14px;
-            color: #4a5568;
-            font-size: 0.65rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            white-space: nowrap;
-        }
-
-        .sniffer-body tbody tr {
-            border-bottom: 1px solid rgba(30,37,48,0.4);
-            transition: background 0.1s;
-        }
-
-        .sniffer-body tbody tr:hover { background: rgba(255,255,255,0.03); }
-
-        .sniffer-body td {
-            padding: 6px 14px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 200px;
-        }
-
-        .s-num    { color: #4a5568; }
-        .s-time   { color: #ffcc00; }
-        .s-src    { color: #00ff88; }
-        .s-dst    { color: #00d4ff; }
-        .s-info   { color: #c8d8e8; opacity: 0.7; max-width: 280px; }
-
-        .s-proto {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 0.65rem;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-        .s-dns  { background: rgba(179,136,255,0.15); color: #b388ff; border: 1px solid rgba(179,136,255,0.3); }
-        .s-http { background: rgba(0,212,255,0.12);   color: #00d4ff; border: 1px solid rgba(0,212,255,0.3); }
-        .s-tcp  { background: rgba(0,255,136,0.10);   color: #00ff88; border: 1px solid rgba(0,255,136,0.25); }
-        .s-udp  { background: rgba(255,204,0,0.12);   color: #ffcc00; border: 1px solid rgba(255,204,0,0.3); }
-        .s-other{ background: rgba(255,255,255,0.05); color: #4a5568; border: 1px solid #1e2530; }
-
-        .sniffer-footer {
-            padding: 10px 20px;
-            border-top: 1px solid #1e2530;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .sniffer-footer a {
-            color: #00ff88;
-            font-family: 'Courier New', monospace;
-            font-size: 0.75rem;
-            text-decoration: none;
-            letter-spacing: 0.5px;
-        }
-        .sniffer-footer a:hover { text-decoration: underline; }
-        .sniffer-count { color: #4a5568; font-family: 'Courier New', monospace; font-size: 0.72rem; }
-    </style>
-</head>
-<body>
-
-<div class="header-bar text-center" style="position:relative;">
-    <div class="container">
-        <h3 class="mb-1 fw-bold">SISTEMA DE SEGURIDAD DE RED</h3>
-        <p class="mb-0 text-uppercase" style="font-size: 0.8rem; color: #94a3b8; letter-spacing: 2px;">TFG - Ander de Castro</p>
+{% block content %}
+<!-- SEMÁFORO DE SALUD DEL NEGOCIO -->
+<div class="health-banner mb-4" id="health-banner">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+    <div class="d-flex align-items-center gap-3">
+      <div class="health-score-circle bg-success" id="health-circle">--</div>
+      <div>
+        <div class="metric-label mb-1">Índice de Salud del Negocio</div>
+        <h5 class="fw-bold mb-1" id="health-msg">Evaluando estado de la red...</h5>
+        <div class="small text-muted" id="health-reasons">Comprobando TPVs, impresoras, Internet y alertas</div>
+      </div>
     </div>
-    <a href="/logout" style="position:absolute;top:50%;right:24px;transform:translateY(-50%);
-        color:#94a3b8;font-size:0.75rem;font-weight:600;text-decoration:none;
-        border:1px solid #334155;padding:6px 14px;border-radius:6px;
-        text-transform:uppercase;letter-spacing:1px;transition:all 0.2s;"
-        onmouseover="this.style.color='#fff';this.style.borderColor='#ef4444'"
-        onmouseout="this.style.color='#94a3b8';this.style.borderColor='#334155'">
-        Salir →
-    </a>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <span class="badge bg-light text-dark border px-3 py-2" id="wan-pill">🌐 WAN: --</span>
+      <span class="badge bg-light text-dark border px-3 py-2" id="horario-pill">
+        🕒 Horario: {{ negocio.horario_apertura }} - {{ negocio.horario_cierre }}
+      </span>
+      <a href="/negocio" class="btn btn-sm btn-outline-primary">Configurar equipos</a>
+    </div>
+  </div>
 </div>
 
-<div class="container">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <span class="badge bg-success">MONITORIZACIÓN ACTIVA</span>
-        <div class="text-muted small">Última Sincronización: <span id="last_update" class="fw-bold">--:--:--</span></div>
+<!-- KPIs PRINCIPALES -->
+<div class="row g-3 mb-4 text-center">
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="metric-label">Consultas DNS hoy</div>
+      <div class="metric-val" id="dns_queries">--</div>
     </div>
-
-    <!-- STATS DNS -->
-    <div class="row g-4 text-center">
-        <div class="col-md-3">
-            <div class="stat-card">
-                <div class="label">Consultas DNS</div>
-                <div class="value" id="dns_queries">0</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="stat-card">
-                <div class="label">Amenazas Bloqueadas</div>
-                <div class="value text-danger" id="ads_blocked">0</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="stat-card">
-                <div class="label">Eficiencia Sistema</div>
-                <div class="value text-success" id="ads_percentage">0%</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="stat-card">
-                <div class="label">Dominios en Blacklist</div>
-                <div class="value" id="domains_blocked" style="color: #64748b;">0</div>
-            </div>
-        </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="metric-label">Amenazas bloqueadas</div>
+      <div class="metric-val text-danger" id="ads_blocked">--</div>
     </div>
-
-    <!-- ACCESOS DIRECTOS -->
-    <h5 class="text-center mt-5 mb-3 text-muted fw-bold text-uppercase" style="font-size: 0.9rem;">Accesos Directos</h5>
-    <div class="row g-3 justify-content-center">
-        <div class="col-md-2"><a href="http://{{ raspberry_ip }}/admin" target="_blank" class="nav-btn">PI-HOLE</a></div>
-        <div class="col-md-2"><a href="http://{{ raspberry_ip }}:3000" target="_blank" class="nav-btn">GRAFANA</a></div>
-        <div class="col-md-2"><a href="http://{{ raspberry_ip }}:3001" target="_blank" class="nav-btn">NTOPNG</a></div>
-        <div class="col-md-2"><a href="http://{{ raspberry_ip }}:9090" target="_blank" class="nav-btn">PROMETHEUS</a></div>
-        <div class="col-md-2"><a href="/sniffer" class="nav-btn">SNIFFER</a></div>
-        <div class="col-md-2"><a href="/estadisticas" class="nav-btn">Estadísticas de Red</a></div>
-        <div class="col-md-2"><a href="/lateral" class="nav-btn">RED INTERNA</a></div>
-        <div class="col-md-2"><a href="/contenedores" class="nav-btn">CONTENEDORES</a></div>
-        <div class="col-md-2" style="position:relative;">
-          <a href="/alertas" class="nav-btn" style="border-color:#fca5a5;">ALERTAS</a>
-          <span id="alertas-badge" style="display:none;position:absolute;top:-6px;right:-6px;
-            background:#dc2626;color:white;border-radius:50%;width:20px;height:20px;
-            font-size:0.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;">
-            0
-          </span>
-        </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="metric-label">Eficiencia filtro DNS</div>
+      <div class="metric-val text-success" id="ads_percentage">--%</div>
     </div>
-
-    <!-- TABLA TRAFICO SQLITE -->
-    <div class="table-container">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h6 class="fw-bold mb-0 text-uppercase small text-muted">Dispositivos en Red — Tráfico en Vivo</h6>
-            <span class="text-muted small">Actualizado: <span id="hosts-refresh">—</span></span>
-        </div>
-        <div class="table-responsive">
-            <table class="table align-middle" id="hosts-table">
-                <thead class="table-light">
-                    <tr>
-                        <th>Dispositivo / IP</th>
-                        <th>Fabricante</th>
-                        <th>MAC</th>
-                        <th>Descarga (MB)</th>
-                        <th>Subida (MB)</th>
-                        <th>Flows</th>
-                        <th>Score</th>
-                    </tr>
-                </thead>
-                <tbody id="hosts-tbody">
-                    <tr><td colspan="6" class="text-center text-muted small py-3">Cargando dispositivos...</td></tr>
-                </tbody>
-            </table>
-        </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="metric-label">Alertas abiertas</div>
+      <div class="metric-val text-warning" id="open_alerts">--</div>
     </div>
-
-    <!-- SNIFFER PREVIEW -->
-    <div class="sniffer-preview">
-        <div class="sniffer-header">
-            <div class="sniffer-title">
-                <span class="dot"></span>CAPTURA EN VIVO — tshark · wlan0
-            </div>
-            <span style="color:#4a5568;font-family:'Courier New',monospace;font-size:0.7rem;" id="sniff-count">cargando…</span>
-        </div>
-        <div class="sniffer-body">
-            <table>
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Tiempo</th>
-                        <th>Origen</th>
-                        <th>Destino</th>
-                        <th>Proto</th>
-                        <th>Info</th>
-                    </tr>
-                </thead>
-                <tbody id="sniffer-tbody">
-                    <tr><td colspan="6" style="color:#4a5568;text-align:center;padding:20px;font-family:'Courier New',monospace;">cargando paquetes…</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <div class="sniffer-footer">
-            <a href="/sniffer">Ver todos los paquetes →</a>
-            <span class="sniffer-count" id="sniff-refresh">—</span>
-        </div>
-    </div>
-
+  </div>
 </div>
 
+<!-- EQUIPOS CRÍTICOS DEL NEGOCIO (IMPRESORAS / PLOTTERS / TPV / NAS) -->
+<div class="panel-card mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+      <span class="live-dot"></span>
+      <span class="fw-bold small text-uppercase text-muted">Equipos Críticos del Negocio (TPVs · Impresoras · Plotters · NAS)</span>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-secondary" onclick="comprobarActivos()">↻ Comprobar ahora</button>
+      <a href="/negocio" class="btn btn-sm btn-primary">+ Añadir equipo</a>
+    </div>
+  </div>
+  <div class="row g-2" id="critical-assets-grid">
+    <div class="col-12 text-muted small">Cargando estado de activos críticos...</div>
+  </div>
+</div>
+
+<!-- ACCESOS A HERRAMIENTAS EXTERNAS -->
+<div class="panel-card mb-4">
+  <div class="metric-label mb-2">Herramientas de Diagnóstico</div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="http://{{ raspberry_ip }}:{{ pihole_port }}/admin" target="_blank" rel="noopener" class="btn btn-sm btn-outline-dark">🕳️ Pi-hole Admin</a>
+    <a href="http://{{ raspberry_ip }}:3001" target="_blank" rel="noopener" class="btn btn-sm btn-outline-dark">📈 ntopng</a>
+    <a href="http://{{ raspberry_ip }}:3000" target="_blank" rel="noopener" class="btn btn-sm btn-outline-dark">📊 Grafana (opcional)</a>
+    <a href="/reporte" class="btn btn-sm btn-outline-success">📄 Generar Informe Ejecutivo</a>
+  </div>
+</div>
+
+<!-- DISPOSITIVOS EN RED EN VIVO -->
+<div class="panel-card mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <span class="fw-bold small text-uppercase text-muted">Dispositivos Activos en Red (ntopng)</span>
+    <span class="text-muted small">Actualizado: <span id="hosts-refresh">—</span></span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Dispositivo / Alias</th>
+          <th>Categoría</th>
+          <th>Fabricante</th>
+          <th>MAC</th>
+          <th>Descarga</th>
+          <th>Subida</th>
+          <th>Score</th>
+          <th>Acción</th>
+        </tr>
+      </thead>
+      <tbody id="hosts-tbody">
+        <tr><td colspan="8" class="text-center text-muted small py-3">Cargando dispositivos...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- SNIFFER PREVIEW -->
+<div class="sniffer-preview">
+  <div class="sniffer-header">
+    <div style="color:#00ff88;font-family:monospace;font-size:0.8rem;font-weight:700;">
+      <span class="live-dot"></span>CAPTURA EN VIVO — tshark · {{ net_interface }}
+    </div>
+    <span style="color:#94a3b8;font-family:monospace;font-size:0.72rem;" id="sniff-count">cargando…</span>
+  </div>
+  <div class="sniffer-body table-responsive">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Tiempo</th><th>Origen</th><th>Destino</th><th>Proto</th><th>Info</th></tr>
+      </thead>
+      <tbody id="sniffer-tbody">
+        <tr><td colspan="6" class="text-center text-secondary py-3">Cargando paquetes...</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="d-flex justify-content-between align-items-center px-3 py-2" style="border-top:1px solid #1e2530;">
+    <a href="/sniffer" style="color:#00ff88;font-family:monospace;font-size:0.76rem;text-decoration:none;">Ver sniffer completo →</a>
+    <span style="color:#64748b;font-family:monospace;font-size:0.72rem;" id="sniff-refresh">—</span>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
-    // --- DNS stats ---
-    async function updateData() {
-        try {
-            const r = await fetch('/api/data');
-            const d = await r.json();
-            document.getElementById('dns_queries').innerText = d.dns_queries_today.toLocaleString();
-            document.getElementById('ads_blocked').innerText = d.ads_blocked_today.toLocaleString();
-            document.getElementById('ads_percentage').innerText = d.ads_percentage_today + '%';
-            document.getElementById('domains_blocked').innerText = d.domains_being_blocked.toLocaleString();
-            document.getElementById('last_update').innerText = d.last_update;
-        } catch (e) { console.log("Error API"); }
+  async function updateResumen() {
+    try {
+      const d = await apiFetch('/api/resumen');
+      if (!d.ok) return;
+      const h = d.health;
+      const circle = document.getElementById('health-circle');
+      const banner = document.getElementById('health-banner');
+      circle.textContent = String(h.score);
+      const colorMap = { success: '#22c55e', warning: '#eab308', danger: '#dc2626' };
+      const bgClass = { success: 'bg-success', warning: 'bg-warning text-dark', danger: 'bg-danger' };
+      circle.className = 'health-score-circle ' + (bgClass[h.color] || 'bg-secondary');
+      banner.style.borderLeftColor = colorMap[h.color] || '#64748b';
+      document.getElementById('health-msg').textContent = h.mensaje;
+      document.getElementById('health-reasons').textContent = h.razones.length
+        ? h.razones.join(' · ')
+        : 'Todos los sistemas y equipos críticos responden correctamente.';
+
+      document.getElementById('open_alerts').textContent = String(h.alertas_abiertas.total);
+      const wanPill = document.getElementById('wan-pill');
+      wanPill.textContent = h.wan_online
+        ? `🌐 WAN: ONLINE (${d.wan_latency_ms ?? '--'} ms · ${h.wan_uptime_24h}% 24h)`
+        : '🔴 WAN: SIN INTERNET';
+
+      const grid = document.getElementById('critical-assets-grid');
+      if (!d.activos_criticos.length) {
+        grid.innerHTML = `<div class="col-12"><div class="alert alert-info mb-0 small">
+          Aún no tienes equipos críticos registrados. Añade tu <b>TPV/Caja</b>, <b>Impresoras/Plotters</b> y <b>NAS de diseños</b> en <a href="/negocio">Mi Negocio</a> para monitorizar su disponibilidad y protegerlos.
+        </div></div>`;
+      } else {
+        grid.innerHTML = d.activos_criticos.map(a => {
+          const badge = a.estado_uptime === 'ONLINE'
+            ? '<span class="badge bg-success">ONLINE</span>'
+            : a.estado_uptime === 'OFFLINE'
+              ? '<span class="badge bg-danger">CAÍDO</span>'
+              : '<span class="badge bg-secondary">SIN CHECK</span>';
+          const lat = a.latencia_ms != null ? `${esc(a.latencia_ms)} ms` : '—';
+          const up = a.uptime_pct != null ? `${esc(a.uptime_pct)}% 24h` : '';
+          return `<div class="col-md-4">
+            <div class="asset-chip">
+              <div>
+                <div class="fw-bold small">${esc(a.categoria_icon)} ${esc(a.nombre)}</div>
+                <div class="text-muted" style="font-size:0.72rem;">${esc(a.ip)} · ${esc(a.categoria_label)}</div>
+              </div>
+              <div class="text-end">
+                ${badge}
+                <div class="text-muted" style="font-size:0.68rem;">${lat} ${up}</div>
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+      }
+    } catch (_) {}
+  }
+
+  async function comprobarActivos() {
+    await apiFetch('/api/activos/check-now', { method: 'POST' });
+    updateResumen();
+  }
+
+  async function updateDns() {
+    try {
+      const d = await apiFetch('/api/data');
+      if (!d.ok) return;
+      document.getElementById('dns_queries').textContent = d.dns_queries_today.toLocaleString('es-ES');
+      document.getElementById('ads_blocked').textContent = d.ads_blocked_today.toLocaleString('es-ES');
+      document.getElementById('ads_percentage').textContent = d.ads_percentage_today + '%';
+    } catch (_) {}
+  }
+
+  async function updateHosts() {
+    try {
+      const d = await apiFetch('/api/hosts');
+      if (!d.ok) return;
+      const tbody = document.getElementById('hosts-tbody');
+      if (!d.hosts.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted small py-3">Sin dispositivos activos reportados por ntopng.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = d.hosts.map(h => {
+        const scoreCls = h.score > 100 ? 'bg-danger' : h.score > 0 ? 'bg-warning text-dark' : 'bg-light text-dark border';
+        const titulo = h.alias ? `${esc(h.alias)} <span class="text-muted small">(${esc(h.ip)})</span>` : `${esc(h.name)}<br><span class="text-muted small">${esc(h.ip)}</span>`;
+        const catBadge = h.categoria === 'NO_REGISTRADO'
+          ? '<span class="badge bg-warning text-dark">❓ Sin clasificar</span>'
+          : `<span class="badge bg-light text-dark border">${esc(h.categoria_icon)} ${esc(h.categoria_label)}</span>`;
+        const quickUrl = `/negocio?ip=${encodeURIComponent(h.ip)}&mac=${encodeURIComponent(h.mac || '')}&nombre=${encodeURIComponent(h.alias || h.name || h.ip)}`;
+        return `<tr>
+          <td class="fw-semibold small">${titulo}</td>
+          <td>${catBadge}</td>
+          <td class="small">${esc(h.fabricante)}</td>
+          <td class="small text-muted font-monospace">${esc(h.mac || '—')}</td>
+          <td><span class="badge bg-light text-dark border">↓ ${esc(h.rcvd_mb)} MB</span></td>
+          <td><span class="badge bg-light text-dark border">↑ ${esc(h.sent_mb)} MB</span></td>
+          <td><span class="badge ${scoreCls}">${esc(h.score)}</span></td>
+          <td><a href="${quickUrl}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:0.72rem;">Clasificar</a></td>
+        </tr>`;
+      }).join('');
+      document.getElementById('hosts-refresh').textContent = new Date().toLocaleTimeString('es-ES');
+    } catch (_) {}
+  }
+
+  async function updateSniffer() {
+    try {
+      const d = await apiFetch('/api/sniffer?n=12');
+      if (!d.ok) return;
+      const tbody = document.getElementById('sniffer-tbody');
+      tbody.innerHTML = d.lineas.map(p => `<tr>
+        <td class="s-num">${esc(p.num)}</td>
+        <td class="s-time">${esc(p.tiempo)}</td>
+        <td class="s-src">${esc(p.src)}</td>
+        <td class="s-dst">${esc(p.dst)}</td>
+        <td><span class="badge bg-secondary">${esc(p.protocolo)}</span></td>
+        <td class="s-info" title="${esc(p.info)}">${esc(p.info)}</td>
+      </tr>`).join('') || '<tr><td colspan="6" class="text-center text-secondary py-3">Sin paquetes recientes</td></tr>';
+      document.getElementById('sniff-count').textContent = `${d.total} paquetes recientes`;
+      document.getElementById('sniff-refresh').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es-ES');
+    } catch (_) {
+      document.getElementById('sniffer-tbody').innerHTML =
+        '<tr><td colspan="6" class="text-center text-secondary py-3">Sin datos — comprueba el contenedor tshark-sflow</td></tr>';
     }
+  }
 
-    setInterval(updateData, 5000);
-    updateData();
-    // --- Hosts table refresh ---
-    async function updateHosts() {
-        try {
-            const r = await fetch('/api/hosts');
-            const d = await r.json();
-            if (!d.ok) return;
-
-            const tbody = document.getElementById('hosts-tbody');
-            tbody.innerHTML = d.hosts.map(h => {
-                const score = h.score > 50 
-                    ? `<span class="badge bg-danger">${h.score}</span>`
-                    : h.score > 0 
-                        ? `<span class="badge bg-warning text-dark">${h.score}</span>`
-                        : `<span class="badge bg-light text-dark border">${h.score}</span>`;
-                const fabricante = h.fabricante && h.fabricante !== 'Desconocido'
-                    ? `<span class="badge bg-light text-dark border">${h.fabricante}</span>`
-                    : `<span class="text-muted small">—</span>`;
-                return `<tr>
-                    <td class="fw-bold">${h.name}<br><span class="text-muted small">${h.ip}</span></td>
-                    <td>${fabricante}</td>
-                    <td class="text-muted small">${h.mac}</td>
-                    <td><span class="badge bg-light text-dark border">↓ ${h.rcvd_mb} MB</span></td>
-                    <td><span class="badge bg-light text-dark border">↑ ${h.sent_mb} MB</span></td>
-                    <td class="text-muted small">${h.flows}</td>
-                    <td>${score}</td>
-                </tr>`;
-            }).join('');
-
-            document.getElementById('hosts-refresh').textContent = new Date().toLocaleTimeString('es-ES');
-        } catch(e) { console.log('Error hosts:', e); }
-    }
-
-    setInterval(updateHosts, 15000);
-    updateHosts();
-
-    // --- Alertas badge ---
-    async function updateAlertasBadge() {
-        try {
-            const r = await fetch('/api/alertas?n=1');
-            const d = await r.json();
-            if (!d.ok) return;
-            const badge = document.getElementById('alertas-badge');
-            if (d.no_leidas > 0) {
-                badge.style.display = 'flex';
-                badge.textContent = d.no_leidas > 9 ? '9+' : d.no_leidas;
-            } else {
-                badge.style.display = 'none';
-            }
-        } catch(e) {}
-    }
-    setInterval(updateAlertasBadge, 30000);
-    updateAlertasBadge();
-
-    setTimeout(() => { window.location.reload(); }, 120000);
-
-    // --- Sniffer preview (últimos 15 paquetes) ---
-    function protoClass(p) {
-        p = (p || '').toUpperCase();
-        if (p.includes('DNS'))  return 's-dns';
-        if (p.includes('HTTP')) return 's-http';
-        if (p.includes('TCP'))  return 's-tcp';
-        if (p.includes('UDP'))  return 's-udp';
-        return 's-other';
-    }
-
-    async function updateSniffer() {
-        try {
-            const r = await fetch('/api/sniffer?n=15');
-            const d = await r.json();
-            if (!d.ok) return;
-
-            const tbody = document.getElementById('sniffer-tbody');
-            tbody.innerHTML = d.lineas.map(p => `
-                <tr>
-                    <td class="s-num">${p.num}</td>
-                    <td class="s-time">${p.tiempo}</td>
-                    <td class="s-src">${p.src}</td>
-                    <td class="s-dst">${p.dst}</td>
-                    <td><span class="s-proto ${protoClass(p.protocolo)}">${p.protocolo}</span></td>
-                    <td class="s-info" title="${p.info}">${p.info}</td>
-                </tr>`).join('');
-
-            document.getElementById('sniff-count').textContent = `${d.total} paquetes totales`;
-            document.getElementById('sniff-refresh').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es-ES');
-        } catch(e) {
-            document.getElementById('sniffer-tbody').innerHTML =
-                '<tr><td colspan="6" style="color:#4a5568;text-align:center;padding:16px;font-family:Courier New,monospace;">Sin datos — comprueba tshark-sflow</td></tr>';
-        }
-    }
-
-    setInterval(updateSniffer, 8000);
-    updateSniffer();
+  updateResumen(); updateDns(); updateHosts(); updateSniffer();
+  setInterval(updateResumen, 15000);
+  setInterval(updateDns, 15000);
+  setInterval(updateHosts, 20000);
+  setInterval(updateSniffer, 10000);
 </script>
-</body>
-</html>
+{% endblock %}
